@@ -366,7 +366,7 @@ create policy "public insert rsvps" on rsvps for insert with check (true);</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-create')">Cancel</button>
-      <button class="btn btn-primary" id="create-event-btn" onclick="createEvent()">Create Event</button>
+      <button class="btn btn-primary" id="create-event-btn" onclick="console.log('button clicked')">Create Event</button>
     </div>
   </div>
 </div>
@@ -866,12 +866,12 @@ document.getElementById('color-pick').addEventListener('click', ev => {
 });
 
 async function createEvent() {
- console.log('A');
+
   const title = document.getElementById('new-title').value.trim();
   if (!title) { showToast('Please enter an event name.', true); return; }
- console.log('B');
+
   const rows = document.querySelectorAll('#items-builder .item-builder-row');
- console.log('C');
+
   const itemRows = [...rows].map((r, i) => {
     const textInput = r.querySelector('input[type="text"]');
       if (!textInput) return null;
@@ -879,8 +879,7 @@ async function createEvent() {
     const qty = parseInt(r.querySelector('.qty').value) || 1;
     return name ? { name, qty, sort_order: i } : null;
   }).filter(Boolean);
-console.log('D');
- consol.log('sb =', sb);
+
   setBtnLoading('create-event-btn', true);
   try {
     const { data: ev, error: evErr } = await sb.from('events').insert({
@@ -891,7 +890,6 @@ console.log('D');
       color: selectedColor
     }).select().single();
     if (evErr) throw evErr;
-console.log('E');
     if (itemRows.length) {
       const { error: itemErr } = await sb.from('items').insert(itemRows.map(r => ({ ...r, event_id: ev.id, claimed_by: null })));
       if (itemErr) throw itemErr;
