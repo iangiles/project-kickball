@@ -882,13 +882,13 @@ async function createEvent() {
 
   setBtnLoading('create-event-btn', true);
   try {
-    const { data: ev, error: evErr } = await sb.from('events').insert({
+    const { data: ev, error: evErr } = await sb.from('events').insert([{
       title,
       datetime: document.getElementById('new-datetime').value || null,
       location: document.getElementById('new-location').value.trim() || null,
       description: document.getElementById('new-desc').value.trim() || null,
       color: selectedColor
-    }).select().single();
+    }]).select().single();
     if (evErr) throw evErr;
     if (itemRows.length) {
       const { error: itemErr } = await sb.from('items').insert(itemRows.map(r => ({ ...r, event_id: ev.id, claimed_by: null })));
