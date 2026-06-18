@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gather — Event Hosting</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,700;1,9..144,300&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #1C1F2E; --surface: #252839; --card: #2E3247;
+    --cream: #F7F3EE; --muted: #9CA3AF; --amber: #F59E0B;
+    --rose: #F43F5E; --sage: #6B8F71; --blue: #6366F1;
+    --border: rgba(255,255,255,0.08); --radius: 12px;
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--cream); min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* NAV */
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .logo { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 700; color: var(--amber); letter-spacing: -0.5px; }
+  .logo span { color: var(--cream); font-weight: 300; font-style: italic; }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab { padding: 6px 16px; border-radius: 8px; border: none; background: transparent; color: var(--muted); font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .nav-tab.active { background: var(--card); color: var(--cream); }
+  .nav-tab:hover:not(.active) { color: var(--cream); }
+  .nav-admin-area { display: flex; align-items: center; gap: 10px; }
+  .btn { padding: 8px 18px; border-radius: 8px; border: none; font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--amber); color: #1C1F2E; }
+  .btn-primary:hover { background: #FBBF24; }
+  .btn-rose { background: var(--rose); color: white; }
+  .btn-rose:hover { background: #FB5573; }
+  .btn-ghost { background: var(--border); color: var(--cream); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.12); }
+  .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+  .btn-danger { background: rgba(244,63,94,0.15); color: var(--rose); border: 1px solid rgba(244,63,94,0.3); }
+  .btn-danger:hover { background: rgba(244,63,94,0.25); }
+
+  /* SETUP SCREEN */
+  #setup-screen { display: none; flex: 1; align-items: center; justify-content: center; padding: 40px 20px; }
+  #setup-screen.active { display: flex; }
+  .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; max-width: 520px; width: 100%; }
+  .setup-card h2 { font-family: 'Fraunces', serif; font-size: 1.8rem; font-weight: 700; margin-bottom: 6px; }
+  .setup-card .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; line-height: 1.6; }
+  .setup-steps { counter-reset: step; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+  .setup-step { display: flex; gap: 12px; align-items: flex-start; }
+  .setup-step::before { counter-increment: step; content: counter(step); background: var(--card); color: var(--amber); border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .setup-step p { font-size: 0.88rem; color: #C4BDB5; line-height: 1.6; }
+  .setup-step code { background: var(--card); color: var(--amber); padding: 1px 6px; border-radius: 4px; font-size: 0.82rem; }
+  .setup-sql { background: var(--card); border-radius: 8px; padding: 14px 16px; font-family: monospace; font-size: 0.78rem; color: #86EFAC; line-height: 1.7; margin: 8px 0; white-space: pre; overflow-x: auto; position: relative; }
+  .copy-sql-btn { position: absolute; top: 8px; right: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 3px 8px; font-size: 0.7rem; cursor: pointer; font-family: 'Inter', sans-serif; }
+  .copy-sql-btn:hover { color: var(--cream); }
+  .setup-error { color: var(--rose); font-size: 0.82rem; margin-top: 8px; display: none; }
+  .setup-error.show { display: block; }
+
+  /* LOADING */
+  .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(28,31,46,0.8); z-index: 500; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+  .loading-overlay.active { display: flex; }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--amber); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-overlay p { color: var(--muted); font-size: 0.88rem; }
+
+  /* MAIN */
+  main { flex: 1; padding: 32px; max-width: 1100px; margin: 0 auto; width: 100%; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* DASHBOARD */
+  .dashboard-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; }
+  .dashboard-header h1 { font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 600; line-height: 1.1; }
+  .dashboard-header p { color: var(--muted); margin-top: 4px; font-size: 0.9rem; }
+  .events-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+  .event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; cursor: pointer; transition: border-color 0.15s, transform 0.15s; position: relative; overflow: hidden; }
+  .event-card:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
+  .event-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent, var(--amber)); }
+  .event-card-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent, var(--amber)); margin-bottom: 8px; }
+  .event-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 600; margin-bottom: 6px; line-height: 1.2; }
+  .event-card-meta { font-size: 0.82rem; color: var(--muted); margin-bottom: 16px; line-height: 1.7; }
+  .event-card-meta span { display: block; }
+  .items-bar-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; }
+  .items-bar { height: 6px; background: var(--card); border-radius: 99px; overflow: hidden; margin-bottom: 14px; }
+  .items-bar-fill { height: 100%; background: var(--sage); border-radius: 99px; transition: width 0.4s; }
+  .event-card-footer { display: flex; justify-content: space-between; align-items: center; }
+  .rsvp-count { font-size: 0.82rem; }
+  .rsvp-count strong { color: var(--cream); }
+  .rsvp-count span { color: var(--muted); }
+
+  .empty-state { text-align: center; padding: 80px 20px; color: var(--muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
+  .empty-state h3 { font-family: 'Fraunces', serif; font-size: 1.4rem; color: var(--cream); margin-bottom: 8px; }
+  .empty-state p { font-size: 0.9rem; margin-bottom: 24px; }
+
+  /* DETAIL */
+  .detail-back { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.85rem; cursor: pointer; margin-bottom: 24px; transition: color 0.15s; background: none; border: none; font-family: 'Inter', sans-serif; }
+  .detail-back:hover { color: var(--cream); }
+  .detail-hero { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .detail-hero::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--accent, var(--amber)); }
+  .detail-hero h1 { font-family: 'Fraunces', serif; font-size: 2.2rem; font-weight: 700; margin-bottom: 10px; line-height: 1.15; }
+  .detail-meta { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; }
+  .detail-meta-item { display: flex; align-items: center; gap: 7px; font-size: 0.88rem; color: var(--muted); }
+  .detail-meta-item strong { color: var(--cream); }
+  .detail-desc { font-size: 0.92rem; color: #C4BDB5; line-height: 1.7; }
+  .detail-share { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 14px 18px; margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .share-url { font-size: 0.8rem; color: var(--blue); font-family: monospace; word-break: break-all; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width: 640px) { .detail-grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .panel h2 { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  /* RSVP & ITEMS */
+  .rsvp-list { display: flex; flex-direction: column; gap: 10px; }
+  .rsvp-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border-radius: 8px; font-size: 0.88rem; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--amber); color: #1C1F2E; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
+  .rsvp-item .name { font-weight: 500; flex: 1; }
+  .badge { padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .badge-yes { background: rgba(107,143,113,0.2); color: #86EFAC; }
+  .badge-maybe { background: rgba(245,158,11,0.2); color: #FCD34D; }
+  .badge-no { background: rgba(244,63,94,0.2); color: #FCA5A5; }
+  .items-list { display: flex; flex-direction: column; gap: 8px; }
+  .item-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border-radius: 8px; font-size: 0.88rem; }
+  .item-row .item-name { flex: 1; font-weight: 500; }
+  .item-row .item-qty { color: var(--muted); font-size: 0.78rem; }
+  .item-claimed { text-decoration: line-through; color: var(--muted); }
+  .item-claimer { font-size: 0.75rem; color: var(--sage); }
+  .item-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--card); border: 2px solid var(--sage); flex-shrink: 0; }
+  .item-dot.claimed { background: var(--sage); border-color: var(--sage); }
+
+  /* MODALS */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; animation: modalIn 0.2s ease; }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+  .modal h2 { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 600; margin-bottom: 4px; }
+  .modal-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--muted); margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .form-group input, .form-group textarea, .form-group select { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--cream); font-family: 'Inter', sans-serif; font-size: 0.9rem; outline: none; transition: border-color 0.15s; }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--amber); }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .items-builder { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .new-items-builder { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .item-builder-row { display: flex; gap: 8px; align-items: center; }
+  .item-builder-row input { flex: 1; }
+  .item-builder-row input.qty { width: 70px; flex: none; }
+  .remove-item-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; padding: 4px; line-height: 1; transition: color 0.15s; }
+  .remove-item-btn:hover { color: var(--rose); }
+  .add-item-btn { background: none; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); font-size: 0.82rem; cursor: pointer; padding: 8px; width: 100%; font-family: 'Inter', sans-serif; transition: all 0.15s; }
+  .add-item-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .rsvp-options { display: flex; gap: 8px; margin-top: 4px; }
+  .rsvp-option { flex: 1; padding: 10px; border-radius: 8px; border: 2px solid var(--border); background: var(--card); color: var(--muted); font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 500; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .rsvp-option.selected-yes { border-color: var(--sage); color: #86EFAC; background: rgba(107,143,113,0.15); }
+  .rsvp-option.selected-maybe { border-color: var(--amber); color: #FCD34D; background: rgba(245,158,11,0.12); }
+  .rsvp-option.selected-no { border-color: var(--rose); color: #FCA5A5; background: rgba(244,63,94,0.1); }
+  .claim-items { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .claim-item-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border-radius: 8px; cursor: pointer; transition: background 0.12s; border: 2px solid transparent; }
+  .claim-item-row:hover:not(.taken) { background: rgba(107,143,113,0.1); }
+  .claim-item-row.selected { border-color: var(--sage); }
+  .claim-item-row.taken { opacity: 0.5; cursor: not-allowed; }
+  .claim-item-row input[type=checkbox] { accent-color: var(--sage); width: 16px; height: 16px; }
+  .claim-item-name { flex: 1; font-size: 0.88rem; }
+  .claim-item-taken-by { font-size: 0.75rem; color: var(--sage); }
+  .color-pick { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: border-color 0.12s; }
+  .color-swatch.selected { border-color: white; }
+
+  /* ADMIN */
+  .admin-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.35); color: var(--amber); border-radius: 99px; padding: 4px 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; }
+  .btn-logout { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 5px 12px; font-size: 0.78rem; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.15s; }
+  .btn-logout:hover { color: var(--rose); border-color: var(--rose); }
+  .admin-login-prompt { background: rgba(245,158,11,0.07); border: 1px dashed rgba(245,158,11,0.3); border-radius: 10px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .admin-login-prompt p { font-size: 0.85rem; color: var(--muted); }
+  .admin-login-prompt strong { color: var(--amber); }
+  .pw-input-wrap { position: relative; }
+  .pw-input-wrap input { padding-right: 40px; }
+  .pw-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 0; }
+  .form-error { color: var(--rose); font-size: 0.78rem; margin-top: 6px; display: none; }
+  .form-error.show { display: block; }
+  .change-pw-link { background: none; border: none; color: var(--muted); font-size: 0.78rem; cursor: pointer; text-decoration: underline; font-family: 'Inter', sans-serif; padding: 0; transition: color 0.15s; }
+  .change-pw-link:hover { color: var(--amber); }
+
+  /* DB status dot */
+  .db-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sage); display: inline-block; margin-right: 4px; }
+  .db-dot.error { background: var(--rose); }
+
+  /* SEARCH */
+  .search-bar { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; color: var(--cream); font-size: 0.95rem; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.15s; margin-bottom: 24px; }
+  .search-bar:focus { border-color: var(--amber); }
+  .search-bar::placeholder { color: var(--muted); }
+
+  /* TOAST */
+  #toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; background: var(--sage); color: white; padding: 12px 20px; border-radius: 10px; font-size: 0.88rem; font-weight: 500; transform: translateY(80px); opacity: 0; transition: all 0.25s; pointer-events: none; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.error { background: var(--rose); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">gather<span>.</span></div>
+  <div class="nav-tabs" id="nav-tabs" style="display:none;">
+    <button class="nav-tab active" onclick="switchView('host')">Events</button>
+    <button class="nav-tab" onclick="switchView('public')">Browse</button>
+  </div>
+  <div class="nav-admin-area" id="nav-admin-area"></div>
+</nav>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <h2>Connection Problem</h2>
+    <p class="sub">Gather couldn't connect to its database. This is usually temporary — but if it persists, you can verify or re-enter the database credentials below.</p>
+    <div class="setup-steps">
+      <div class="setup-step"><p>Go to <strong>supabase.com</strong>, create a free account, and start a new project.</p></div>
+      <div class="setup-step"><p>In your project, open the <strong>SQL Editor</strong> and run this to create the tables:</p></div>
+    </div>
+    <div class="setup-sql" id="setup-sql">create table if not exists events (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  datetime timestamptz,
+  location text,
+  description text,
+  color text default '#F59E0B',
+  created_at timestamptz default now()
+);
+
+create table if not exists items (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid references events(id) on delete cascade,
+  name text not null,
+  qty int default 1,
+  claimed_by text,
+  sort_order int default 0
+);
+
+create table if not exists rsvps (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid references events(id) on delete cascade,
+  name text not null,
+  email text,
+  note text,
+  status text check (status in ('yes','maybe','no')),
+  created_at timestamptz default now()
+);
+
+-- Allow public read/write (no auth required for guests)
+alter table events enable row level security;
+alter table items enable row level security;
+alter table rsvps enable row level security;
+
+create policy "public read events" on events for select using (true);
+create policy "public insert events" on events for insert with check (true);
+create policy "public update events" on events for update using (true);
+create policy "public delete events" on events for delete using (true);
+
+create policy "public read items" on items for select using (true);
+create policy "public insert items" on items for insert with check (true);
+create policy "public update items" on items for update using (true);
+create policy "public delete items" on items for delete using (true);
+
+create policy "public read rsvps" on rsvps for select using (true);
+create policy "public insert rsvps" on rsvps for insert with check (true);
+
+-- Shared admin password (stored as a SHA-256 hash, synced across all browsers)
+create table if not exists settings (
+  key text primary key,
+  value text
+);
+alter table settings enable row level security;
+create policy "public read settings" on settings for select using (true);
+create policy "public write settings" on settings for insert with check (true);
+create policy "public update settings" on settings for update using (true);</div>
+    <button class="copy-sql-btn" onclick="copySql()">Copy</button>
+    <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the <code>settings</code> table block above in your existing project's SQL Editor — no need to redo the rest.</p>
+
+    <div class="setup-steps" style="margin-top:16px;">
+      <div class="setup-step"><p>Go to <strong>Project Settings → API</strong>. Copy your <code>Project URL</code> and <code>anon public</code> key below.</p></div>
+    </div>
+    <div class="form-group" style="margin-top:4px;">
+      <label>Supabase Project URL</label>
+      <input type="text" id="setup-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
+    </div>
+    <div class="form-group">
+      <label>Supabase Anon Key</label>
+      <input type="text" id="setup-key" placeholder="eyJhbGci...">
+    </div>
+    <div class="form-error show" id="setup-error" style="display:none!important;"></div>
+    <button class="btn btn-ghost" style="width:100%;justify-content:center;margin-bottom:10px;" onclick="connectSupabase(DEFAULT_SB_URL, DEFAULT_SB_KEY)">↻ Retry with default connection</button>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="connectSupabase()">Connect with these credentials →</button>
+    <p style="color:var(--muted);font-size:0.75rem;margin-top:12px;text-align:center;">Your credentials are saved in this browser only and never sent anywhere else.</p>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <p id="loading-msg">Loading…</p>
+</div>
+
+<main id="main-app" style="display:none;">
+  <!-- HOST VIEW -->
+  <div id="view-host" class="view active">
+    <div class="dashboard-header">
+      <div>
+        <h1>Your Events</h1>
+        <p>Manage gatherings, see who's coming, track what's needed.</p>
+      </div>
+      <div id="host-create-btn"></div>
+    </div>
+    <div id="admin-login-prompt-bar"></div>
+    <div id="host-events-grid" class="events-grid">
+      <div class="empty-state" id="host-empty" style="display:none;">
+        <div class="icon">🎉</div>
+        <h3>No events yet</h3>
+        <p>Create your first event to get started.</p>
+        <button class="btn btn-primary" onclick="requireAdmin(openCreateModal)">+ Create Event</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PUBLIC VIEW -->
+  <div id="view-public" class="view">
+    <div class="dashboard-header">
+      <div><h1>Upcoming Events</h1><p>Find an event and let the host know you're coming.</p></div>
+    </div>
+    <input class="search-bar" type="text" placeholder="Search events by name or location…" oninput="filterPublicEvents(this.value)">
+    <div id="public-events-grid" class="events-grid"></div>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div id="view-detail" class="view">
+    <button class="detail-back" onclick="backToList()">← Back</button>
+    <div class="detail-hero" id="detail-hero">
+      <h1 id="detail-title"></h1>
+      <div class="detail-meta" id="detail-meta"></div>
+      <div class="detail-desc" id="detail-desc"></div>
+      <div class="detail-share" id="detail-share"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:20px;" id="detail-actions"></div>
+    <div class="detail-grid">
+      <div class="panel">
+        <h2>🙋 RSVPs <span id="rsvp-count-badge" style="font-size:0.8rem;font-weight:400;color:var(--muted);"></span></h2>
+        <div id="rsvp-list" class="rsvp-list"></div>
+        <button class="btn btn-primary" style="margin-top:14px;width:100%;" onclick="openRsvpModal()">RSVP to this event</button>
+      </div>
+      <div class="panel">
+        <h2>🧺 Sign-up List</h2>
+        <div id="items-progress" style="margin-bottom:14px;"></div>
+        <div id="items-list" class="items-list"></div>
+        <button class="btn btn-ghost" style="margin-top:14px;width:100%;" onclick="openClaimModal()">Claim an item</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- CREATE EVENT MODAL -->
+<div class="modal-overlay" id="modal-create">
+  <div class="modal">
+    <h2>Create an Event</h2>
+    <p class="modal-sub">Fill in the details — you can share the link with guests after.</p>
+    <div class="form-group"><label>Event Name</label><input type="text" id="new-title" placeholder="Summer Potluck at the Park"></div>
+    <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="new-datetime"></div>
+    <div class="form-group"><label>Location</label><input type="text" id="new-location" placeholder="Volunteer Park, Seattle"></div>
+    <div class="form-group"><label>Description</label><textarea id="new-desc" placeholder="Tell guests what to expect…"></textarea></div>
+    <div class="form-group">
+      <label>Color Theme</label>
+      <div class="color-pick" id="color-pick">
+        <div class="color-swatch selected" data-color="#F59E0B" style="background:#F59E0B"></div>
+        <div class="color-swatch" data-color="#F43F5E" style="background:#F43F5E"></div>
+        <div class="color-swatch" data-color="#6366F1" style="background:#6366F1"></div>
+        <div class="color-swatch" data-color="#06B6D4" style="background:#06B6D4"></div>
+        <div class="color-swatch" data-color="#10B981" style="background:#10B981"></div>
+        <div class="color-swatch" data-color="#8B5CF6" style="background:#8B5CF6"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Items Guests Can Bring</label>
+      <div class="items-builder" id="items-builder"></div>
+      <button class="add-item-btn" onclick="addItemRow()">+ Add item</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-create')">Cancel</button>
+      <button class="btn btn-primary" id="create-event-btn" onclick="createNewEvent()">Create Event</button>
+    </div>
+  </div>
+</div>
+
+<!-- RSVP MODAL -->
+<div class="modal-overlay" id="modal-rsvp">
+  <div class="modal">
+    <h2>RSVP</h2>
+    <p class="modal-sub" id="rsvp-modal-sub"></p>
+    <div class="form-group"><label>Your Name</label><input type="text" id="rsvp-name" placeholder="Jane Smith"></div>
+    <div class="form-group"><label>Email (optional)</label><input type="email" id="rsvp-email" placeholder="jane@example.com"></div>
+    <div class="form-group">
+      <label>Are you coming?</label>
+      <div class="rsvp-options">
+        <button class="rsvp-option" onclick="selectRsvp('yes',this)">✅ Yes!</button>
+        <button class="rsvp-option" onclick="selectRsvp('maybe',this)">🤔 Maybe</button>
+        <button class="rsvp-option" onclick="selectRsvp('no',this)">❌ Can't make it</button>
+      </div>
+    </div>
+    <div class="form-group"><label>Note (optional)</label><input type="text" id="rsvp-note" placeholder="Excited to see everyone!"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-rsvp')">Cancel</button>
+      <button class="btn btn-rose" id="rsvp-submit-btn" onclick="submitRsvp()">Submit RSVP</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLAIM ITEM MODAL -->
+<div class="modal-overlay" id="modal-claim">
+  <div class="modal">
+    <h2>Sign Up to Bring Something</h2>
+    <p class="modal-sub">Pick one or more items you'll contribute, or add something new.</p>
+    <div class="form-group"><label>Your Name</label><input type="text" id="claim-name" placeholder="Jane Smith"></div>
+    <div class="form-group"><label>Select Items</label><div class="claim-items" id="claim-items-list"></div></div>
+    <div class="form-group">
+      <label>Bringing Something Not Listed?</label>
+      <div class="new-items-builder" id="new-items-builder"></div>
+      <button class="add-item-btn" onclick="addNewClaimItemRow()">+ Add a new item</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-claim')">Cancel</button>
+      <button class="btn btn-primary" id="claim-submit-btn" onclick="submitClaim()">Confirm Sign-Up</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN MODAL -->
+<div class="modal-overlay" id="modal-admin-login">
+  <div class="modal" style="max-width:400px;">
+    <h2>Admin Sign In</h2>
+    <p class="modal-sub">Enter the admin password to create and manage events.</p>
+    <div class="form-group">
+      <label>Password</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="login-pw" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')submitAdminLogin()">
+        <button class="pw-toggle" onclick="togglePw('login-pw',this)" tabindex="-1">👁</button>
+      </div>
+      <div class="form-error" id="login-error">Incorrect password. Try again.</div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;align-items:center;">
+      <button class="change-pw-link" onclick="closeModal('modal-admin-login');openSetPasswordModal(false)">Forgot / Set new password</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-admin-login')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitAdminLogin()">Sign In</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SET / CHANGE PASSWORD MODAL -->
+<div class="modal-overlay" id="modal-set-password">
+  <div class="modal" style="max-width:420px;">
+    <h2 id="set-pw-title">Set Admin Password</h2>
+    <p class="modal-sub" id="set-pw-sub"></p>
+    <div class="form-group" id="set-pw-current-wrap" style="display:none;">
+      <label>Current Password</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="set-pw-current" placeholder="Your current password">
+        <button class="pw-toggle" onclick="togglePw('set-pw-current',this)" tabindex="-1">👁</button>
+      </div>
+      <div class="form-error" id="set-pw-current-error">Incorrect current password.</div>
+    </div>
+    <div class="form-group">
+      <label>New Password</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="set-pw-new" placeholder="Choose a strong password">
+        <button class="pw-toggle" onclick="togglePw('set-pw-new',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Confirm New Password</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="set-pw-confirm" placeholder="Repeat the password" onkeydown="if(event.key==='Enter')submitSetPassword()">
+        <button class="pw-toggle" onclick="togglePw('set-pw-confirm',this)" tabindex="-1">👁</button>
+      </div>
+      <div class="form-error" id="set-pw-match-error">Passwords don't match.</div>
+      <div class="form-error" id="set-pw-empty-error">Password cannot be empty.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-set-password')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitSetPassword()">Save Password</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── SUPABASE SETUP ───────────────────────────────────────────────
+// Default credentials baked into the app — every browser connects automatically.
+// The anon key is safe to expose client-side; row-level security policies control access.
+const DEFAULT_SB_URL = 'https://lhynjoucgjqryyxuypng.supabase.co';
+const DEFAULT_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoeW5qb3VjZ2pxcnl5eHV5cG5nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjEzNTcsImV4cCI6MjA5NzI5NzM1N30.CTjeJ1NQklBHUo5s6yOPTmhgjn6BIubScL5e3l4Usuw';
+
+const SB_URL_KEY = 'gather_sb_url';
+const SB_KEY_KEY = 'gather_sb_key';
+let sb = null; // supabase client
+
+function getSavedCreds() {
+  return {
+    url: localStorage.getItem(SB_URL_KEY) || DEFAULT_SB_URL,
+    key: localStorage.getItem(SB_KEY_KEY) || DEFAULT_SB_KEY
+  };
+}
+
+async function connectSupabase(url, key) {
+  url = url || document.getElementById('setup-url')?.value.trim();
+  key = key || document.getElementById('setup-key')?.value.trim();
+  const errEl = document.getElementById('setup-error');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  if (!url || !key) { showSetupError('Please enter both your Project URL and anon key.'); return; }
+  if (!url.startsWith('https://')) { showSetupError('URL should start with https://'); return; }
+
+  showLoading('Connecting to Supabase…');
+  try {
+    sb = supabase.createClient(url, key, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    });
+    // Test connection
+    const { error } = await sb.from('events').select('id').limit(1);
+    if (error) throw error;
+    localStorage.setItem(SB_URL_KEY, url);
+    localStorage.setItem(SB_KEY_KEY, key);
+    hideLoading();
+    showApp();
+  } catch(e) {
+    hideLoading();
+    showSetupScreen();
+    showSetupError('Could not connect: ' + (e.message || 'Check your URL and key, and make sure you ran the SQL setup.'));
+    sb = null;
+  }
+}
+
+function showSetupError(msg) {
+  const el = document.getElementById('setup-error');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function showSetupScreen() {
+  document.getElementById('setup-screen').classList.add('active');
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('nav-tabs').style.display = 'none';
+  document.getElementById('nav-admin-area').innerHTML = '';
+}
+
+function showApp() {
+  document.getElementById('setup-screen').classList.remove('active');
+  document.getElementById('main-app').style.display = 'block';
+  document.getElementById('nav-tabs').style.display = 'flex';
+  fetchAdminHash(); // warm the cache so first admin action is instant
+  renderAdminNav();
+  const urlParams = new URLSearchParams(location.search);
+  const linked = urlParams.get('event');
+  if (linked) { showDetail(linked, 'public'); }
+  else { switchView('host'); }
+}
+
+function copySql() {
+  const txt = document.getElementById('setup-sql').textContent;
+  navigator.clipboard.writeText(txt).then(() => showToast('SQL copied! 📋'));
+}
+
+// ─── LOADING ──────────────────────────────────────────────────────
+function showLoading(msg) {
+  document.getElementById('loading-msg').textContent = msg || 'Loading…';
+  document.getElementById('loading').classList.add('active');
+}
+function hideLoading() { document.getElementById('loading').classList.remove('active'); }
+
+// ─── STATE ────────────────────────────────────────────────────────
+let currentEventId = null;
+let currentEventData = null; // { event, items, rsvps }
+let allEvents = [];
+let selectedRsvpStatus = null;
+let selectedColor = '#F59E0B';
+let currentView = 'host';
+let fromView = 'host';
+
+// ─── ADMIN AUTH ───────────────────────────────────────────────────
+// Password hash is stored in Supabase (settings table) so it's shared
+// across every browser/device — not just the one that set it.
+const ADMIN_SESSION_KEY = 'gather_admin_session'; // per-tab sign-in only
+const ADMIN_SETTINGS_KEY = 'admin_pw_hash';
+let cachedAdminHash = undefined; // undefined = not yet loaded, null = no password set
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function fetchAdminHash(force) {
+  if (cachedAdminHash !== undefined && !force) return cachedAdminHash;
+  try {
+    const { data, error } = await sb.from('settings').select('value').eq('key', ADMIN_SETTINGS_KEY).maybeSingle();
+    if (error) throw error;
+    cachedAdminHash = data ? data.value : null;
+  } catch(e) {
+    cachedAdminHash = null;
+  }
+  return cachedAdminHash;
+}
+
+async function saveAdminHash(hash) {
+  const { error } = await sb.from('settings').upsert({ key: ADMIN_SETTINGS_KEY, value: hash });
+  if (error) throw error;
+  cachedAdminHash = hash;
+}
+
+function isAdminLoggedIn() { return sessionStorage.getItem(ADMIN_SESSION_KEY) === '1'; }
+async function hasAdminPassword() { return !!(await fetchAdminHash()); }
+
+let pendingAdminAction = null;
+async function requireAdmin(action) {
+  if (isAdminLoggedIn()) { action(); return; }
+  const hasPw = await hasAdminPassword();
+  if (!hasPw) { openSetPasswordModal(true, action); return; }
+  pendingAdminAction = action;
+  document.getElementById('login-pw').value = '';
+  document.getElementById('login-error').classList.remove('show');
+  openModal('modal-admin-login');
+}
+
+async function submitAdminLogin() {
+  const pw = document.getElementById('login-pw').value;
+  const hash = await sha256(pw);
+  const storedHash = await fetchAdminHash();
+  if (hash === storedHash) {
+    sessionStorage.setItem(ADMIN_SESSION_KEY, '1');
+    closeModal('modal-admin-login');
+    renderAdminNav();
+    renderHostDashboard();
+    showToast('Signed in as admin ✓');
+    if (pendingAdminAction) { pendingAdminAction(); pendingAdminAction = null; }
+  } else {
+    document.getElementById('login-error').classList.add('show');
+    document.getElementById('login-pw').value = '';
+    document.getElementById('login-pw').focus();
+  }
+}
+
+function adminLogout() {
+  sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  renderAdminNav();
+  renderHostDashboard();
+  showToast('Signed out.');
+}
+
+let _setPwIsChange = false;
+let _setPwCallback = null;
+async function openSetPasswordModal(isFirstTime, callback) {
+  const hasPw = await hasAdminPassword();
+  _setPwIsChange = !isFirstTime && hasPw;
+  _setPwCallback = callback || null;
+  document.getElementById('set-pw-title').textContent = _setPwIsChange ? 'Change Password' : 'Set Admin Password';
+  document.getElementById('set-pw-sub').textContent = _setPwIsChange
+    ? 'Enter the current password then choose a new one. This updates the password for everyone, on every device.'
+    : 'Choose a password — only admins with this password can create or delete events. It will work from any browser or device.';
+  document.getElementById('set-pw-current-wrap').style.display = _setPwIsChange ? '' : 'none';
+  ['set-pw-current','set-pw-new','set-pw-confirm'].forEach(id => document.getElementById(id).value = '');
+  ['set-pw-current-error','set-pw-match-error','set-pw-empty-error'].forEach(id => document.getElementById(id).classList.remove('show'));
+  openModal('modal-set-password');
+}
+
+async function submitSetPassword() {
+  const newPw = document.getElementById('set-pw-new').value;
+  const confirmPw = document.getElementById('set-pw-confirm').value;
+  ['set-pw-empty-error','set-pw-match-error','set-pw-current-error'].forEach(id => document.getElementById(id).classList.remove('show'));
+  if (!newPw) { document.getElementById('set-pw-empty-error').classList.add('show'); return; }
+  if (newPw !== confirmPw) { document.getElementById('set-pw-match-error').classList.add('show'); return; }
+  if (_setPwIsChange) {
+    const h = await sha256(document.getElementById('set-pw-current').value);
+    const storedHash = await fetchAdminHash();
+    if (h !== storedHash) { document.getElementById('set-pw-current-error').classList.add('show'); return; }
+  }
+  try {
+    await saveAdminHash(await sha256(newPw));
+  } catch(e) {
+    showToast('Error saving password: ' + e.message, true);
+    return;
+  }
+  sessionStorage.setItem(ADMIN_SESSION_KEY, '1');
+  closeModal('modal-set-password');
+  renderAdminNav();
+  renderHostDashboard();
+  showToast(_setPwIsChange ? 'Password updated for all devices ✓' : 'Admin password set — you\'re signed in ✓');
+  if (_setPwCallback) { _setPwCallback(); _setPwCallback = null; }
+}
+
+function renderAdminNav() {
+  const el = document.getElementById('nav-admin-area');
+  if (isAdminLoggedIn()) {
+    el.innerHTML = `
+      <span class="admin-badge">🔑 Admin</span>
+      <button class="change-pw-link" onclick="openSetPasswordModal(false)">Change password</button>
+      <button class="btn-logout" onclick="adminLogout()">Sign out</button>
+      <button class="btn btn-primary" onclick="requireAdmin(openCreateModal)">+ New Event</button>`;
+  } else {
+    el.innerHTML = `<button class="btn btn-ghost" onclick="requireAdmin(()=>{})">🔒 Admin Sign In</button>`;
+  }
+}
+
+function renderAdminPromptBar() {
+  const el = document.getElementById('admin-login-prompt-bar');
+  if (!isAdminLoggedIn()) {
+    el.innerHTML = `<div class="admin-login-prompt">
+      <p><strong>Admin access required</strong> to create or manage events. Guests can freely RSVP and claim items.</p>
+      <button class="btn btn-primary btn-sm" onclick="requireAdmin(()=>{})">Sign In</button>
+    </div>`;
+  } else { el.innerHTML = ''; }
+}
+
+function togglePw(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+// ─── VIEWS ────────────────────────────────────────────────────────
+function switchView(v) {
+  currentView = v;
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', (i===0&&v==='host')||(i===1&&v==='public')));
+  if (v === 'host') renderHostDashboard();
+  if (v === 'public') renderPublicEvents();
+}
+
+async function showDetail(id, from) {
+  fromView = from || currentView;
+  currentEventId = id;
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-detail').classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  showLoading('Loading event…');
+  await loadEventDetail(id);
+  hideLoading();
+  renderDetail();
+}
+
+function backToList() { switchView(fromView); }
+
+// ─── DB CALLS ─────────────────────────────────────────────────────
+async function fetchAllEvents() {
+  const { data, error } = await sb.from('events').select('*').order('datetime', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function loadEventDetail(id) {
+  const [evRes, itemRes, rsvpRes] = await Promise.all([
+    sb.from('events').select('*').eq('id', id).single(),
+    sb.from('items').select('*').eq('event_id', id).order('sort_order'),
+    sb.from('rsvps').select('*').eq('event_id', id).order('created_at')
+  ]);
+  if (evRes.error) throw evRes.error;
+  currentEventData = { event: evRes.data, items: itemRes.data || [], rsvps: rsvpRes.data || [] };
+}
+
+// ─── RENDER HOST DASHBOARD ────────────────────────────────────────
+async function renderHostDashboard() {
+  renderAdminPromptBar();
+  const createBtn = document.getElementById('host-create-btn');
+  createBtn.innerHTML = isAdminLoggedIn()
+    ? `<button class="btn btn-primary" onclick="requireAdmin(openCreateModal)">+ New Event</button>` : '';
+
+  showLoading('Loading events…');
+  try {
+    allEvents = await fetchAllEvents();
+  } catch(e) {
+    hideLoading(); showToast('Error loading events: ' + e.message, true); return;
+  }
+  hideLoading();
+
+  const grid = document.getElementById('host-events-grid');
+  const empty = document.getElementById('host-empty');
+
+  if (!allEvents.length) {
+  empty.style.display = '';
+  grid.innerHTML = '';
+  return;
+  }
+
+  empty.style.display = 'none';
+  grid.innerHTML = allEvents.map(e => eventCardHTML(e, 'host')).join('');
+}
+
+async function renderPublicEvents(filter = '') {
+  showLoading('Loading events…');
+  try { allEvents = await fetchAllEvents(); } catch(e) { hideLoading(); return; }
+  hideLoading();
+  const filtered = filter
+    ? allEvents.filter(e => e.title.toLowerCase().includes(filter.toLowerCase()) || (e.location||'').toLowerCase().includes(filter.toLowerCase()))
+    : allEvents;
+  const grid = document.getElementById('public-events-grid');
+  grid.innerHTML = filtered.length
+    ? filtered.map(e => eventCardHTML(e, 'public')).join('')
+    : '<div class="empty-state"><div class="icon">🔍</div><h3>No events found</h3><p>Try a different search or check back later.</p></div>';
+}
+
+function filterPublicEvents(v) { renderPublicEvents(v); }
+
+function eventCardHTML(e, context) {
+  const date = e.datetime ? new Date(e.datetime).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : 'Date TBD';
+  const time = e.datetime ? new Date(e.datetime).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+  return `<div class="event-card" style="--accent:${e.color||'#F59E0B'}" onclick="showDetail('${e.id}','${context}')">
+    <div class="event-card-label">${context==='host'?'📌 Hosted Event':'🎟 Open Event'}</div>
+    <h3>${esc(e.title)}</h3>
+    <div class="event-card-meta">
+      <span>📅 ${date}${time?' · '+time:''}</span>
+      ${e.location?`<span>📍 ${esc(e.location)}</span>`:''}
+    </div>
+    <div class="event-card-footer">
+      <div class="rsvp-count"><span>Click to view RSVPs & items</span></div>
+      <button class="btn btn-ghost btn-sm">View →</button>
+    </div>
+  </div>`;
+}
+
+// ─── DETAIL ───────────────────────────────────────────────────────
+function renderDetail() {
+  const { event: e, items, rsvps } = currentEventData;
+  const hero = document.getElementById('detail-hero');
+  hero.style.setProperty('--accent', e.color || '#F59E0B');
+  document.getElementById('detail-title').textContent = e.title;
+
+  const date = e.datetime ? new Date(e.datetime).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : 'Date TBD';
+  const time = e.datetime ? new Date(e.datetime).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+  const yesCount = rsvps.filter(r => r.status === 'yes').length;
+
+  document.getElementById('detail-meta').innerHTML = `
+    <div class="detail-meta-item">📅 <strong>${date}${time?' at '+time:''}</strong></div>
+    ${e.location?`<div class="detail-meta-item">📍 <strong>${esc(e.location)}</strong></div>`:''}
+    <div class="detail-meta-item">🙋 <strong>${yesCount} attending</strong></div>`;
+  document.getElementById('detail-desc').textContent = e.description || '';
+
+  const shareUrl = `${location.origin}${location.pathname}?event=${e.id}`;
+  document.getElementById('detail-share').innerHTML = `
+    <div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.05em;">Share this event</div>
+      <div class="share-url">${shareUrl}</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="copyLink('${shareUrl}')">Copy Link</button>`;
+
+  document.getElementById('detail-actions').innerHTML = isAdminLoggedIn()
+    ? `<button class="btn btn-danger btn-sm" onclick="requireAdmin(()=>deleteEvent('${e.id}'))">🗑 Delete Event</button>` : '';
+
+  // RSVPs
+  document.getElementById('rsvp-count-badge').textContent = `(${rsvps.length})`;
+  const rsvpList = document.getElementById('rsvp-list');
+  rsvpList.innerHTML = rsvps.length
+    ? rsvps.map(r => `<div class="rsvp-item">
+        <div class="avatar">${r.name[0].toUpperCase()}</div>
+        <span class="name">${esc(r.name)}</span>
+        ${r.note?`<span style="color:var(--muted);font-size:0.78rem;font-style:italic">"${esc(r.note)}"</span>`:''}
+        <span class="badge badge-${r.status}">${r.status==='yes'?'Going':r.status==='maybe'?'Maybe':'Nope'}</span>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:0.85rem;">No RSVPs yet — be the first!</p>';
+
+  // Items
+  const total = items.length, claimed = items.filter(i => i.claimed_by).length;
+  const pct = total > 0 ? Math.round((claimed/total)*100) : 0;
+  document.getElementById('items-progress').innerHTML = total > 0
+    ? `<div class="items-bar-label"><span style="font-size:0.8rem;color:var(--muted);">${claimed} of ${total} items claimed</span><span style="font-size:0.8rem;color:var(--sage);">${pct}%</span></div>
+       <div class="items-bar"><div class="items-bar-fill" style="width:${pct}%"></div></div>` : '';
+  document.getElementById('items-list').innerHTML = items.length
+    ? items.map(it => `<div class="item-row">
+        <div class="item-dot ${it.claimed_by?'claimed':''}"></div>
+        <span class="item-name ${it.claimed_by?'item-claimed':''}">${esc(it.name)}</span>
+        ${it.qty>1?`<span class="item-qty">×${it.qty}</span>`:''}
+        ${it.claimed_by?`<span class="item-claimer">✓ ${esc(it.claimed_by)}</span>`:'<span style="color:var(--muted);font-size:0.75rem;">Open</span>'}
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:0.85rem;">No items needed — just bring yourself!</p>';
+}
+
+// ─── CREATE EVENT ─────────────────────────────────────────────────
+function openCreateModal() {
+  ['new-title','new-datetime','new-location','new-desc'].forEach(id => document.getElementById(id).value = '');
+  selectedColor = '#F59E0B';
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s.dataset.color === selectedColor));
+  document.getElementById('items-builder').innerHTML = '';
+  addItemRow();
+  openModal('modal-create');
+}
+
+function addItemRow() {
+  const row = document.createElement('div');
+  row.className = 'item-builder-row';
+  row.innerHTML = `<input type="text" placeholder="Item name (e.g. Potato salad)">
+    <input type="number" class="qty" value="1" min="1" placeholder="Qty">
+    <button class="remove-item-btn" onclick="this.parentElement.remove()">×</button>`;
+  document.getElementById('items-builder').appendChild(row);
+}
+
+document.getElementById('color-pick').addEventListener('click', ev => {
+  const swatch = ev.target.closest('.color-swatch');
+  if (!swatch) return;
+  selectedColor = swatch.dataset.color;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s === swatch));
+});
+
+async function createNewEvent() {
+
+  const title = document.getElementById('new-title').value.trim();
+  if (!title) { showToast('Please enter an event name.', true); return; }
+
+  const rows = document.querySelectorAll('#items-builder .item-builder-row');
+
+  const itemRows = [...rows].map((r, i) => {
+    const textInput = r.querySelector('input[type="text"]');
+      if (!textInput) return null;
+      const name = textInput.value.trim();
+    const qty = parseInt(r.querySelector('.qty').value) || 1;
+    return name ? { name, qty, sort_order: i } : null;
+  }).filter(Boolean);
+
+  setBtnLoading('create-event-btn', true);
+  try {
+    const { data: ev, error: evErr } = await sb.from('events').insert([{
+      title,
+      datetime: document.getElementById('new-datetime').value || null,
+      location: document.getElementById('new-location').value.trim() || null,
+      description: document.getElementById('new-desc').value.trim() || null,
+      color: selectedColor
+    }]).select().single();
+    if (evErr) throw evErr;
+    if (itemRows.length) {
+      const { error: itemErr } = await sb.from('items').insert(itemRows.map(r => ({ ...r, event_id: ev.id, claimed_by: null })));
+      if (itemErr) throw itemErr;
+    }
+
+    closeModal('modal-create');
+    showToast('Event created! 🎉');
+    switchView('host');
+  } catch(e) {
+    showToast('Error creating event: ' + e.message, true);
+  } finally {
+    setBtnLoading('create-event-btn', false);
+  }
+}
+
+// ─── RSVP ─────────────────────────────────────────────────────────
+function openRsvpModal() {
+  document.getElementById('rsvp-modal-sub').textContent = `For: ${currentEventData.event.title}`;
+  ['rsvp-name','rsvp-email','rsvp-note'].forEach(id => document.getElementById(id).value = '');
+  selectedRsvpStatus = null;
+  document.querySelectorAll('.rsvp-option').forEach(o => o.className = 'rsvp-option');
+  openModal('modal-rsvp');
+}
+
+function selectRsvp(status, el) {
+  selectedRsvpStatus = status;
+  document.querySelectorAll('.rsvp-option').forEach(o => o.className = 'rsvp-option');
+  el.classList.add('selected-' + status);
+}
+
+async function submitRsvp() {
+  const name = document.getElementById('rsvp-name').value.trim();
+  if (!name) { showToast('Please enter your name.', true); return; }
+  if (!selectedRsvpStatus) { showToast('Please choose your attendance.', true); return; }
+  setBtnLoading('rsvp-submit-btn', true);
+  try {
+    const { error } = await sb.from('rsvps').insert({
+      event_id: currentEventId,
+      name,
+      email: document.getElementById('rsvp-email').value.trim() || null,
+      note: document.getElementById('rsvp-note').value.trim() || null,
+      status: selectedRsvpStatus
+    });
+    if (error) throw error;
+    closeModal('modal-rsvp');
+    await loadEventDetail(currentEventId);
+    renderDetail();
+    showToast('RSVP submitted! Thanks 🙌');
+  } catch(e) {
+    showToast('Error submitting RSVP: ' + e.message, true);
+  } finally {
+    setBtnLoading('rsvp-submit-btn', false);
+  }
+}
+
+// ─── CLAIM ITEMS ──────────────────────────────────────────────────
+function openClaimModal() {
+  document.getElementById('claim-name').value = '';
+  const items = currentEventData.items;
+  const list = document.getElementById('claim-items-list');
+  list.innerHTML = !items.length
+    ? '<p style="color:var(--muted);font-size:0.85rem;">No items on the list for this event.</p>'
+    : items.map(it => `
+      <label class="claim-item-row ${it.claimed_by?'taken':''}">
+        <input type="checkbox" data-id="${it.id}" ${it.claimed_by?'disabled':''}>
+        <span class="claim-item-name">${esc(it.name)}${it.qty>1?` <span style="color:var(--muted)">×${it.qty}</span>`:''}</span>
+        ${it.claimed_by?`<span class="claim-item-taken-by">Taken by ${esc(it.claimed_by)}</span>`:''}
+      </label>`).join('');
+  document.getElementById('new-items-builder').innerHTML = '';
+  openModal('modal-claim');
+}
+
+function addNewClaimItemRow() {
+  const row = document.createElement('div');
+  row.className = 'item-builder-row';
+  row.innerHTML = `<input type="text" placeholder="Item name (e.g. Plates)">
+    <input type="number" class="qty" value="1" min="1" placeholder="Qty">
+    <button class="remove-item-btn" onclick="this.parentElement.remove()">×</button>`;
+  document.getElementById('new-items-builder').appendChild(row);
+}
+
+async function submitClaim() {
+  const name = document.getElementById('claim-name').value.trim();
+  if (!name) { showToast('Please enter your name.', true); return; }
+
+  const checks = [...document.querySelectorAll('#claim-items-list input[type=checkbox]:checked')];
+  const newRows = [...document.querySelectorAll('#new-items-builder .item-builder-row')];
+  const newItems = newRows.map(r => {
+    const itemName = r.querySelector('input[type=text]').value.trim();
+    const qty = parseInt(r.querySelector('.qty').value) || 1;
+    return itemName ? { name: itemName, qty } : null;
+  }).filter(Boolean);
+
+  if (!checks.length && !newItems.length) { showToast('Select an item or add a new one.', true); return; }
+
+  setBtnLoading('claim-submit-btn', true);
+  try {
+    // Claim existing items
+    for (const c of checks) {
+      const { error } = await sb.from('items').update({ claimed_by: name }).eq('id', c.dataset.id).is('claimed_by', null);
+      if (error) throw error;
+    }
+    // Insert and claim new items in one step
+    if (newItems.length) {
+      const maxSort = currentEventData.items.reduce((m, it) => Math.max(m, it.sort_order || 0), 0);
+      const rowsToInsert = newItems.map((it, i) => ({
+        event_id: currentEventId,
+        name: it.name,
+        qty: it.qty,
+        claimed_by: name,
+        sort_order: maxSort + i + 1
+      }));
+      const { error: insertErr } = await sb.from('items').insert(rowsToInsert);
+      if (insertErr) throw insertErr;
+    }
+
+    closeModal('modal-claim');
+    await loadEventDetail(currentEventId);
+    renderDetail();
+    const total = checks.length + newItems.length;
+    showToast(`Thanks ${name}! ${total} item${total>1?'s':''} added ✓`);
+  } catch(e) {
+    showToast('Error claiming items: ' + e.message, true);
+  } finally {
+    setBtnLoading('claim-submit-btn', false);
+  }
+}
+
+// ─── DELETE ───────────────────────────────────────────────────────
+async function deleteEvent(id) {
+  if (!isAdminLoggedIn()) { requireAdmin(() => deleteEvent(id)); return; }
+  if (!confirm('Delete this event and all its RSVPs? This cannot be undone.')) return;
+  showLoading('Deleting…');
+  try {
+    const { error } = await sb.from('events').delete().eq('id', id);
+    if (error) throw error;
+    hideLoading();
+    showToast('Event deleted.');
+    backToList();
+  } catch(e) {
+    hideLoading();
+    showToast('Error deleting: ' + e.message, true);
+  }
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function copyLink(url) { navigator.clipboard.writeText(url).then(() => showToast('Link copied! 📋')); }
+
+function setBtnLoading(id, loading) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.style.opacity = loading ? '0.6' : '';
+}
+
+let toastTimer;
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = isError ? 'show error' : 'show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────
+(async () => {
+  const { url, key } = getSavedCreds();
+  await connectSupabase(url, key);
+})();
+</script>
+</body>
+</html>
