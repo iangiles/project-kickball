@@ -273,6 +273,7 @@ create policy "public delete items" on items for delete using (true);
 
 create policy "public read rsvps" on rsvps for select using (true);
 create policy "public insert rsvps" on rsvps for insert with check (true);
+create policy "users update own rsvps" on rsvps for update using (auth.uid() = user_id);
 
 -- Shared admin password (stored as a SHA-256 hash, synced across all browsers)
 create table if not exists settings (
@@ -286,7 +287,11 @@ create policy "public update settings" on settings for update using (true);
 
 -- User accounts: link RSVPs and item claims to a logged-in user (optional, nullable)
 alter table rsvps add column if not exists user_id uuid references auth.users(id);
-alter table items add column if not exists claimed_by_user_id uuid references auth.users(id);</div>
+alter table items add column if not exists claimed_by_user_id uuid references auth.users(id);
+
+-- Let logged-in users update their own RSVP instead of creating duplicates
+drop policy if exists "users update own rsvps" on rsvps;
+create policy "users update own rsvps" on rsvps for update using (auth.uid() = user_id);</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
 
@@ -1240,12 +1245,26 @@ async function createNewEvent() {
 function openRsvpModal() {
   document.getElementById('rsvp-modal-sub').textContent = `For: ${currentEventData.event.title}`;
   ['rsvp-name','rsvp-email','rsvp-note'].forEach(id => document.getElementById(id).value = '');
+  selectedRsvpStatus = null;
+  document.querySelectorAll('.rsvp-option').forEach(o => o.className = 'rsvp-option');
+
   if (currentUser) {
     document.getElementById('rsvp-name').value = userDisplayName();
     document.getElementById('rsvp-email').value = currentUser.email || '';
+    // If they've already RSVP'd to this event, pre-fill their existing answer
+    const existing = currentEventData.rsvps.find(r => r.user_id === currentUser.id);
+    if (existing) {
+      document.getElementById('rsvp-name').value = existing.name;
+      document.getElementById('rsvp-email').value = existing.email || currentUser.email || '';
+      document.getElementById('rsvp-note').value = existing.note || '';
+      selectedRsvpStatus = existing.status;
+      const matchingBtn = [...document.querySelectorAll('.rsvp-option')].find(o => o.textContent.toLowerCase().includes(
+        existing.status === 'yes' ? 'yes' : existing.status === 'maybe' ? 'maybe' : "can't"
+      ));
+      if (matchingBtn) matchingBtn.classList.add('selected-' + existing.status);
+      document.getElementById('rsvp-modal-sub').textContent = `For: ${currentEventData.event.title} — updating your existing RSVP`;
+    }
   }
-  selectedRsvpStatus = null;
-  document.querySelectorAll('.rsvp-option').forEach(o => o.className = 'rsvp-option');
   openModal('modal-rsvp');
 }
 
@@ -1261,19 +1280,35 @@ async function submitRsvp() {
   if (!selectedRsvpStatus) { showToast('Please choose your attendance.', true); return; }
   setBtnLoading('rsvp-submit-btn', true);
   try {
-    const { error } = await sb.from('rsvps').insert({
-      event_id: currentEventId,
-      name,
-      email: document.getElementById('rsvp-email').value.trim() || null,
-      note: document.getElementById('rsvp-note').value.trim() || null,
-      status: selectedRsvpStatus,
-      user_id: currentUser ? currentUser.id : null
-    });
-    if (error) throw error;
+    const email = document.getElementById('rsvp-email').value.trim() || null;
+    const note = document.getElementById('rsvp-note').value.trim() || null;
+
+    // Logged-in users: update their existing RSVP for this event instead of creating a duplicate
+    const existing = currentUser
+      ? currentEventData.rsvps.find(r => r.user_id === currentUser.id)
+      : null;
+
+    if (existing) {
+      const { error } = await sb.from('rsvps')
+        .update({ name, email, note, status: selectedRsvpStatus })
+        .eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from('rsvps').insert({
+        event_id: currentEventId,
+        name,
+        email,
+        note,
+        status: selectedRsvpStatus,
+        user_id: currentUser ? currentUser.id : null
+      });
+      if (error) throw error;
+    }
+
     closeModal('modal-rsvp');
     await loadEventDetail(currentEventId);
     renderDetail();
-    showToast('RSVP submitted! Thanks 🙌');
+    showToast(existing ? 'RSVP updated ✓' : 'RSVP submitted! Thanks 🙌');
   } catch(e) {
     showToast('Error submitting RSVP: ' + e.message, true);
   } finally {
