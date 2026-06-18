@@ -25,6 +25,15 @@
   .nav-tab.active { background: var(--card); color: var(--cream); }
   .nav-tab:hover:not(.active) { color: var(--cream); }
   .nav-admin-area { display: flex; align-items: center; gap: 10px; }
+  .nav-user-area { display: flex; align-items: center; gap: 10px; }
+  .user-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 99px; padding: 4px 14px 4px 6px; font-size: 0.82rem; }
+  .user-chip .avatar-sm { width: 22px; height: 22px; border-radius: 50%; background: var(--blue); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; flex-shrink: 0; }
+  .auth-tabs { display: flex; gap: 4px; background: var(--card); border-radius: 8px; padding: 4px; margin-bottom: 22px; }
+  .auth-tab { flex: 1; padding: 8px; border-radius: 6px; border: none; background: transparent; color: var(--muted); font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .auth-tab.active { background: var(--surface); color: var(--cream); }
+  .my-events-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; font-weight: 600; padding: 2px 9px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .tag-rsvp { background: rgba(99,102,241,0.18); color: #A5B4FC; }
+  .tag-item { background: rgba(107,143,113,0.18); color: #86EFAC; }
   .btn { padding: 8px 18px; border-radius: 8px; border: none; font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
   .btn-primary { background: var(--amber); color: #1C1F2E; }
   .btn-primary:hover { background: #FBBF24; }
@@ -201,8 +210,12 @@
   <div class="nav-tabs" id="nav-tabs" style="display:none;">
     <button class="nav-tab active" onclick="switchView('host')">Events</button>
     <button class="nav-tab" onclick="switchView('public')">Browse</button>
+    <button class="nav-tab" onclick="switchView('mine')">My Events</button>
   </div>
-  <div class="nav-admin-area" id="nav-admin-area"></div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div class="nav-user-area" id="nav-user-area"></div>
+    <div class="nav-admin-area" id="nav-admin-area"></div>
+  </div>
 </nav>
 
 <!-- SETUP SCREEN -->
@@ -269,9 +282,13 @@ create table if not exists settings (
 alter table settings enable row level security;
 create policy "public read settings" on settings for select using (true);
 create policy "public write settings" on settings for insert with check (true);
-create policy "public update settings" on settings for update using (true);</div>
+create policy "public update settings" on settings for update using (true);
+
+-- User accounts: link RSVPs and item claims to a logged-in user (optional, nullable)
+alter table rsvps add column if not exists user_id uuid references auth.users(id);
+alter table items add column if not exists claimed_by_user_id uuid references auth.users(id);</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
-    <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the <code>settings</code> table block above in your existing project's SQL Editor — no need to redo the rest.</p>
+    <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
 
     <div class="setup-steps" style="margin-top:16px;">
       <div class="setup-step"><p>Go to <strong>Project Settings → API</strong>. Copy your <code>Project URL</code> and <code>anon public</code> key below.</p></div>
@@ -325,6 +342,14 @@ create policy "public update settings" on settings for update using (true);</div
     </div>
     <input class="search-bar" type="text" placeholder="Search events by name or location…" oninput="filterPublicEvents(this.value)">
     <div id="public-events-grid" class="events-grid"></div>
+  </div>
+
+  <!-- MY EVENTS VIEW -->
+  <div id="view-mine" class="view">
+    <div class="dashboard-header">
+      <div><h1>My Events</h1><p>Everything you've RSVP'd to or signed up to bring something for.</p></div>
+    </div>
+    <div id="mine-content"></div>
   </div>
 
   <!-- DETAIL VIEW -->
@@ -486,6 +511,39 @@ create policy "public update settings" on settings for update using (true);</div
   </div>
 </div>
 
+<!-- USER AUTH MODAL -->
+<div class="modal-overlay" id="modal-auth">
+  <div class="modal" style="max-width:400px;">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="auth-tab-login" onclick="setAuthTab('login')">Sign In</button>
+      <button class="auth-tab" id="auth-tab-signup" onclick="setAuthTab('signup')">Create Account</button>
+    </div>
+    <h2 id="auth-title">Welcome back</h2>
+    <p class="modal-sub" id="auth-sub">Sign in to track which events you're going to.</p>
+
+    <div class="form-group" id="auth-name-wrap" style="display:none;">
+      <label>Your Name</label>
+      <input type="text" id="auth-name" placeholder="Jane Smith">
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="auth-email" placeholder="jane@example.com">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="auth-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')submitAuth()">
+        <button class="pw-toggle" onclick="togglePw('auth-password',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <div class="form-error" id="auth-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-auth')">Cancel</button>
+      <button class="btn btn-primary" id="auth-submit-btn" onclick="submitAuth()">Sign In</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -518,11 +576,22 @@ async function connectSupabase(url, key) {
   try {
     sb = supabase.createClient(url, key, {
       auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+        persistSession: true,
+        autoRefreshToken: true,
         detectSessionInUrl: false
       }
     });
+    // Some sandboxed/iframe environments throw when GoTrue tries to use
+    // BroadcastChannel for cross-tab session sync. That's non-essential —
+    // swallow it so it doesn't block the rest of the app from working.
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const testChannel = new BroadcastChannel('gather-test');
+        testChannel.close();
+      }
+    } catch(bcErr) {
+      console.warn('BroadcastChannel unavailable in this environment; cross-tab session sync disabled.', bcErr);
+    }
     // Test connection
     const { error } = await sb.from('events').select('id').limit(1);
     if (error) throw error;
@@ -537,6 +606,20 @@ async function connectSupabase(url, key) {
     sb = null;
   }
 }
+
+// Suppress noisy, non-critical DataCloneError thrown by GoTrue's cross-tab
+// BroadcastChannel sync in some sandboxed environments. Auth still works;
+// only the "log out in one tab logs you out everywhere" convenience is lost.
+window.addEventListener('error', e => {
+  if (e?.message?.includes('DataCloneError') || e?.error?.name === 'DataCloneError') {
+    e.preventDefault();
+  }
+});
+window.addEventListener('unhandledrejection', e => {
+  if (e?.reason?.name === 'DataCloneError') {
+    e.preventDefault();
+  }
+});
 
 function showSetupError(msg) {
   const el = document.getElementById('setup-error');
@@ -557,6 +640,7 @@ function showApp() {
   document.getElementById('main-app').style.display = 'block';
   document.getElementById('nav-tabs').style.display = 'flex';
   fetchAdminHash(); // warm the cache so first admin action is instant
+  initUserSession();
   renderAdminNav();
   const urlParams = new URLSearchParams(location.search);
   const linked = urlParams.get('event');
@@ -584,6 +668,117 @@ let selectedRsvpStatus = null;
 let selectedColor = '#F59E0B';
 let currentView = 'host';
 let fromView = 'host';
+
+// ─── USER ACCOUNTS ────────────────────────────────────────────────
+let currentUser = null; // Supabase auth user object, or null
+
+async function initUserSession() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    currentUser = session?.user || null;
+  } catch(e) {
+    currentUser = null;
+  }
+  renderUserNav();
+  try {
+    sb.auth.onAuthStateChange((event, session) => {
+      currentUser = session?.user || null;
+      renderUserNav();
+      if (currentView === 'mine') renderMyEvents();
+    });
+  } catch(e) { /* ignore if listener registration fails in sandboxed env */ }
+}
+
+function userDisplayName() {
+  if (!currentUser) return '';
+  return currentUser.user_metadata?.name || currentUser.email.split('@')[0];
+}
+
+function userInitial() {
+  const n = userDisplayName();
+  return n ? n[0].toUpperCase() : '?';
+}
+
+function renderUserNav() {
+  const el = document.getElementById('nav-user-area');
+  if (currentUser) {
+    el.innerHTML = `
+      <span class="user-chip"><span class="avatar-sm">${userInitial()}</span>${esc(userDisplayName())}</span>
+      <button class="btn-logout" onclick="userSignOut()">Sign out</button>`;
+  } else {
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="openAuthModal('login')">Sign In</button>`;
+  }
+}
+
+let authMode = 'login';
+function setAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('auth-tab-login').classList.toggle('active', mode === 'login');
+  document.getElementById('auth-tab-signup').classList.toggle('active', mode === 'signup');
+  document.getElementById('auth-title').textContent = mode === 'login' ? 'Welcome back' : 'Create your account';
+  document.getElementById('auth-sub').textContent = mode === 'login'
+    ? 'Sign in to track which events you\'re going to.'
+    : 'Save your name so RSVPs and item sign-ups are one click.';
+  document.getElementById('auth-name-wrap').style.display = mode === 'signup' ? '' : 'none';
+  document.getElementById('auth-submit-btn').textContent = mode === 'login' ? 'Sign In' : 'Create Account';
+  document.getElementById('auth-error').classList.remove('show');
+}
+
+function openAuthModal(mode) {
+  setAuthTab(mode || 'login');
+  ['auth-name','auth-email','auth-password'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('auth-error').classList.remove('show');
+  openModal('modal-auth');
+}
+
+async function submitAuth() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.classList.remove('show');
+
+  if (!email || !password) { errEl.textContent = 'Please enter both email and password.'; errEl.classList.add('show'); return; }
+
+  setBtnLoading('auth-submit-btn', true);
+  try {
+    if (authMode === 'signup') {
+      const name = document.getElementById('auth-name').value.trim();
+      if (!name) { errEl.textContent = 'Please enter your name.'; errEl.classList.add('show'); setBtnLoading('auth-submit-btn', false); return; }
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name } } });
+      if (error) throw error;
+      currentUser = data.user;
+      closeModal('modal-auth');
+      renderUserNav();
+      if (data.session) {
+        showToast(`Welcome, ${name}! 🎉`);
+      } else {
+        showToast('Account created! Check your email to confirm, then sign in.');
+      }
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      currentUser = data.user;
+      closeModal('modal-auth');
+      renderUserNav();
+      showToast(`Welcome back, ${userDisplayName()}! 👋`);
+    }
+    if (currentView === 'mine') renderMyEvents();
+  } catch(e) {
+    errEl.textContent = e.message || 'Something went wrong.';
+    errEl.classList.add('show');
+  } finally {
+    setBtnLoading('auth-submit-btn', false);
+  }
+}
+
+async function userSignOut() {
+  try { await sb.auth.signOut(); } catch(e) {}
+  currentUser = null;
+  renderUserNav();
+  if (currentView === 'mine') renderMyEvents();
+  showToast('Signed out.');
+}
+
 
 // ─── ADMIN AUTH ───────────────────────────────────────────────────
 // Password hash is stored in Supabase (settings table) so it's shared
@@ -729,9 +924,10 @@ function switchView(v) {
   currentView = v;
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + v).classList.add('active');
-  document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', (i===0&&v==='host')||(i===1&&v==='public')));
+  document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', (i===0&&v==='host')||(i===1&&v==='public')||(i===2&&v==='mine')));
   if (v === 'host') renderHostDashboard();
   if (v === 'public') renderPublicEvents();
+  if (v === 'mine') renderMyEvents();
 }
 
 async function showDetail(id, from) {
@@ -808,16 +1004,84 @@ async function renderPublicEvents(filter = '') {
 
 function filterPublicEvents(v) { renderPublicEvents(v); }
 
-function eventCardHTML(e, context) {
+// ─── MY EVENTS ────────────────────────────────────────────────────
+async function renderMyEvents() {
+  const container = document.getElementById('mine-content');
+  if (!currentUser) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="icon">🔐</div>
+      <h3>Sign in to see your events</h3>
+      <p>Create an account or sign in to track everything you've RSVP'd to or signed up to bring.</p>
+      <button class="btn btn-primary" onclick="openAuthModal('login')">Sign In</button>
+    </div>`;
+    return;
+  }
+
+  showLoading('Loading your events…');
+  try {
+    const [rsvpRes, itemRes] = await Promise.all([
+      sb.from('rsvps').select('event_id, status').eq('user_id', currentUser.id),
+      sb.from('items').select('event_id, name, qty').eq('claimed_by_user_id', currentUser.id)
+    ]);
+    if (rsvpRes.error) throw rsvpRes.error;
+    if (itemRes.error) throw itemRes.error;
+
+    const rsvpByEvent = {};
+    (rsvpRes.data || []).forEach(r => { rsvpByEvent[r.event_id] = r.status; });
+    const itemsByEvent = {};
+    (itemRes.data || []).forEach(it => { (itemsByEvent[it.event_id] = itemsByEvent[it.event_id] || []).push(it); });
+
+    const eventIds = [...new Set([...Object.keys(rsvpByEvent), ...Object.keys(itemsByEvent)])];
+    hideLoading();
+
+    if (!eventIds.length) {
+      container.innerHTML = `<div class="empty-state">
+        <div class="icon">🗓️</div>
+        <h3>No events yet</h3>
+        <p>RSVP to an event or sign up to bring something, and it'll show up here.</p>
+        <button class="btn btn-primary" onclick="switchView('public')">Browse Events</button>
+      </div>`;
+      return;
+    }
+
+    const { data: events, error: evErr } = await sb.from('events').select('*').in('id', eventIds).order('datetime', { ascending: true });
+    if (evErr) throw evErr;
+
+    container.innerHTML = `<div class="events-grid">${events.map(e => eventCardHTML(e, 'mine', {
+      rsvpStatus: rsvpByEvent[e.id],
+      items: itemsByEvent[e.id] || []
+    })).join('')}</div>`;
+  } catch(e) {
+    hideLoading();
+    container.innerHTML = '';
+    showToast('Error loading your events: ' + e.message, true);
+  }
+}
+
+function eventCardHTML(e, context, mineInfo) {
   const date = e.datetime ? new Date(e.datetime).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : 'Date TBD';
   const time = e.datetime ? new Date(e.datetime).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
-  return `<div class="event-card" style="--accent:${e.color||'#F59E0B'}" onclick="showDetail('${e.id}','${context}')">
-    <div class="event-card-label">${context==='host'?'📌 Hosted Event':'🎟 Open Event'}</div>
+  let tagsHtml = '';
+  if (context === 'mine' && mineInfo) {
+    const tags = [];
+    if (mineInfo.rsvpStatus) {
+      const label = mineInfo.rsvpStatus === 'yes' ? 'You\'re going' : mineInfo.rsvpStatus === 'maybe' ? 'You said maybe' : 'You declined';
+      tags.push(`<span class="my-events-tag tag-rsvp">🙋 ${label}</span>`);
+    }
+    if (mineInfo.items && mineInfo.items.length) {
+      const names = mineInfo.items.map(i => esc(i.name)).join(', ');
+      tags.push(`<span class="my-events-tag tag-item">🧺 Bringing: ${names}</span>`);
+    }
+    if (tags.length) tagsHtml = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">${tags.join('')}</div>`;
+  }
+  return `<div class="event-card" style="--accent:${e.color||'#F59E0B'}" onclick="showDetail('${e.id}','${context==='mine'?'mine':context}')">
+    <div class="event-card-label">${context==='host'?'📌 Hosted Event':context==='mine'?'⭐ Your Event':'🎟 Open Event'}</div>
     <h3>${esc(e.title)}</h3>
     <div class="event-card-meta">
       <span>📅 ${date}${time?' · '+time:''}</span>
       ${e.location?`<span>📍 ${esc(e.location)}</span>`:''}
     </div>
+    ${tagsHtml}
     <div class="event-card-footer">
       <div class="rsvp-count"><span>Click to view RSVPs & items</span></div>
       <button class="btn btn-ghost btn-sm">View →</button>
@@ -951,6 +1215,10 @@ async function createNewEvent() {
 function openRsvpModal() {
   document.getElementById('rsvp-modal-sub').textContent = `For: ${currentEventData.event.title}`;
   ['rsvp-name','rsvp-email','rsvp-note'].forEach(id => document.getElementById(id).value = '');
+  if (currentUser) {
+    document.getElementById('rsvp-name').value = userDisplayName();
+    document.getElementById('rsvp-email').value = currentUser.email || '';
+  }
   selectedRsvpStatus = null;
   document.querySelectorAll('.rsvp-option').forEach(o => o.className = 'rsvp-option');
   openModal('modal-rsvp');
@@ -973,7 +1241,8 @@ async function submitRsvp() {
       name,
       email: document.getElementById('rsvp-email').value.trim() || null,
       note: document.getElementById('rsvp-note').value.trim() || null,
-      status: selectedRsvpStatus
+      status: selectedRsvpStatus,
+      user_id: currentUser ? currentUser.id : null
     });
     if (error) throw error;
     closeModal('modal-rsvp');
@@ -989,7 +1258,7 @@ async function submitRsvp() {
 
 // ─── CLAIM ITEMS ──────────────────────────────────────────────────
 function openClaimModal() {
-  document.getElementById('claim-name').value = '';
+  document.getElementById('claim-name').value = currentUser ? userDisplayName() : '';
   const items = currentEventData.items;
   const list = document.getElementById('claim-items-list');
   list.innerHTML = !items.length
@@ -1029,9 +1298,10 @@ async function submitClaim() {
 
   setBtnLoading('claim-submit-btn', true);
   try {
+    const claimedByUserId = currentUser ? currentUser.id : null;
     // Claim existing items
     for (const c of checks) {
-      const { error } = await sb.from('items').update({ claimed_by: name }).eq('id', c.dataset.id).is('claimed_by', null);
+      const { error } = await sb.from('items').update({ claimed_by: name, claimed_by_user_id: claimedByUserId }).eq('id', c.dataset.id).is('claimed_by', null);
       if (error) throw error;
     }
     // Insert and claim new items in one step
@@ -1042,6 +1312,7 @@ async function submitClaim() {
         name: it.name,
         qty: it.qty,
         claimed_by: name,
+        claimed_by_user_id: claimedByUserId,
         sort_order: maxSort + i + 1
       }));
       const { error: insertErr } = await sb.from('items').insert(rowsToInsert);
