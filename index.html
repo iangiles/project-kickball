@@ -36,22 +36,6 @@
   .btn-danger { background: rgba(244,63,94,0.15); color: var(--rose); border: 1px solid rgba(244,63,94,0.3); }
   .btn-danger:hover { background: rgba(244,63,94,0.25); }
 
-  /* SETUP SCREEN */
-  #setup-screen { display: none; flex: 1; align-items: center; justify-content: center; padding: 40px 20px; }
-  #setup-screen.active { display: flex; }
-  .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; max-width: 520px; width: 100%; }
-  .setup-card h2 { font-family: 'Fraunces', serif; font-size: 1.8rem; font-weight: 700; margin-bottom: 6px; }
-  .setup-card .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; line-height: 1.6; }
-  .setup-steps { counter-reset: step; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
-  .setup-step { display: flex; gap: 12px; align-items: flex-start; }
-  .setup-step::before { counter-increment: step; content: counter(step); background: var(--card); color: var(--amber); border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
-  .setup-step p { font-size: 0.88rem; color: #C4BDB5; line-height: 1.6; }
-  .setup-step code { background: var(--card); color: var(--amber); padding: 1px 6px; border-radius: 4px; font-size: 0.82rem; }
-  .setup-sql { background: var(--card); border-radius: 8px; padding: 14px 16px; font-family: monospace; font-size: 0.78rem; color: #86EFAC; line-height: 1.7; margin: 8px 0; white-space: pre; overflow-x: auto; position: relative; }
-  .copy-sql-btn { position: absolute; top: 8px; right: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 3px 8px; font-size: 0.7rem; cursor: pointer; font-family: 'Inter', sans-serif; }
-  .copy-sql-btn:hover { color: var(--cream); }
-  .setup-error { color: var(--rose); font-size: 0.82rem; margin-top: 8px; display: none; }
-  .setup-error.show { display: block; }
 
   /* LOADING */
   .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(28,31,46,0.8); z-index: 500; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
@@ -439,7 +423,6 @@ function showSetupError(msg) {
 
 
 function showApp() {
-  document.getElementById('setup-screen').classList.remove('active');
   document.getElementById('main-app').style.display = 'block';
   document.getElementById('nav-tabs').style.display = 'flex';
   renderAdminNav();
