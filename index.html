@@ -743,12 +743,13 @@ async function renderHostDashboard() {
   const empty = document.getElementById('host-empty');
 
   if (!allEvents.length) {
-  empty.style.display = 'block';
-  grid.querySelectorAll('.event-card').forEach(el => el.remove());
+  empty.style.display = '';
+  grid.innerHTML = '';
   return;
   }
 
-empty.style.display = 'none';
+  empty.style.display = 'none';
+  grid.innerHTML = allEvents.map(e => eventCardHTML(e, 'host')).join('');
 }
 
 async function renderPublicEvents(filter = '') {
