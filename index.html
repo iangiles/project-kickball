@@ -36,6 +36,22 @@
   .btn-danger { background: rgba(244,63,94,0.15); color: var(--rose); border: 1px solid rgba(244,63,94,0.3); }
   .btn-danger:hover { background: rgba(244,63,94,0.25); }
 
+  /* SETUP SCREEN */
+  #setup-screen { display: none; flex: 1; align-items: center; justify-content: center; padding: 40px 20px; }
+  #setup-screen.active { display: flex; }
+  .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; max-width: 520px; width: 100%; }
+  .setup-card h2 { font-family: 'Fraunces', serif; font-size: 1.8rem; font-weight: 700; margin-bottom: 6px; }
+  .setup-card .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; line-height: 1.6; }
+  .setup-steps { counter-reset: step; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+  .setup-step { display: flex; gap: 12px; align-items: flex-start; }
+  .setup-step::before { counter-increment: step; content: counter(step); background: var(--card); color: var(--amber); border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .setup-step p { font-size: 0.88rem; color: #C4BDB5; line-height: 1.6; }
+  .setup-step code { background: var(--card); color: var(--amber); padding: 1px 6px; border-radius: 4px; font-size: 0.82rem; }
+  .setup-sql { background: var(--card); border-radius: 8px; padding: 14px 16px; font-family: monospace; font-size: 0.78rem; color: #86EFAC; line-height: 1.7; margin: 8px 0; white-space: pre; overflow-x: auto; position: relative; }
+  .copy-sql-btn { position: absolute; top: 8px; right: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 3px 8px; font-size: 0.7rem; cursor: pointer; font-family: 'Inter', sans-serif; }
+  .copy-sql-btn:hover { color: var(--cream); }
+  .setup-error { color: var(--rose); font-size: 0.82rem; margin-top: 8px; display: none; }
+  .setup-error.show { display: block; }
 
   /* LOADING */
   .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(28,31,46,0.8); z-index: 500; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
@@ -162,6 +178,9 @@
   .change-pw-link { background: none; border: none; color: var(--muted); font-size: 0.78rem; cursor: pointer; text-decoration: underline; font-family: 'Inter', sans-serif; padding: 0; transition: color 0.15s; }
   .change-pw-link:hover { color: var(--amber); }
 
+  /* DB status dot */
+  .db-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sage); display: inline-block; margin-right: 4px; }
+  .db-dot.error { background: var(--rose); }
 
   /* SEARCH */
   .search-bar { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; color: var(--cream); font-size: 0.95rem; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.15s; margin-bottom: 24px; }
@@ -185,6 +204,78 @@
   <div class="nav-admin-area" id="nav-admin-area"></div>
 </nav>
 
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <h2>Connect to Supabase</h2>
+    <p class="sub">Gather uses Supabase as its database so your events sync across all devices. Set up takes about 2 minutes.</p>
+    <div class="setup-steps">
+      <div class="setup-step"><p>Go to <strong>supabase.com</strong>, create a free account, and start a new project.</p></div>
+      <div class="setup-step"><p>In your project, open the <strong>SQL Editor</strong> and run this to create the tables:</p></div>
+    </div>
+    <div class="setup-sql" id="setup-sql">create table if not exists events (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  datetime timestamptz,
+  location text,
+  description text,
+  color text default '#F59E0B',
+  created_at timestamptz default now()
+);
+
+create table if not exists items (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid references events(id) on delete cascade,
+  name text not null,
+  qty int default 1,
+  claimed_by text,
+  sort_order int default 0
+);
+
+create table if not exists rsvps (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid references events(id) on delete cascade,
+  name text not null,
+  email text,
+  note text,
+  status text check (status in ('yes','maybe','no')),
+  created_at timestamptz default now()
+);
+
+-- Allow public read/write (no auth required for guests)
+alter table events enable row level security;
+alter table items enable row level security;
+alter table rsvps enable row level security;
+
+create policy "public read events" on events for select using (true);
+create policy "public insert events" on events for insert with check (true);
+create policy "public update events" on events for update using (true);
+create policy "public delete events" on events for delete using (true);
+
+create policy "public read items" on items for select using (true);
+create policy "public insert items" on items for insert with check (true);
+create policy "public update items" on items for update using (true);
+create policy "public delete items" on items for delete using (true);
+
+create policy "public read rsvps" on rsvps for select using (true);
+create policy "public insert rsvps" on rsvps for insert with check (true);</div>
+    <button class="copy-sql-btn" onclick="copySql()">Copy</button>
+    <div class="setup-steps" style="margin-top:16px;">
+      <div class="setup-step"><p>Go to <strong>Project Settings → API</strong>. Copy your <code>Project URL</code> and <code>anon public</code> key below.</p></div>
+    </div>
+    <div class="form-group" style="margin-top:4px;">
+      <label>Supabase Project URL</label>
+      <input type="text" id="setup-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
+    </div>
+    <div class="form-group">
+      <label>Supabase Anon Key</label>
+      <input type="text" id="setup-key" placeholder="eyJhbGci...">
+    </div>
+    <div class="form-error show" id="setup-error" style="display:none!important;"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px;" onclick="connectSupabase()">Connect & Continue →</button>
+    <p style="color:var(--muted);font-size:0.75rem;margin-top:12px;text-align:center;">Your credentials are saved in this browser only and never sent anywhere else.</p>
+  </div>
+</div>
 
 <!-- LOADING -->
 <div class="loading-overlay" id="loading">
@@ -376,6 +467,17 @@
   </div>
 </div>
 
+<!-- DISCONNECT MODAL -->
+<div class="modal-overlay" id="modal-disconnect">
+  <div class="modal" style="max-width:380px;">
+    <h2>Disconnect Database</h2>
+    <p class="modal-sub">This will remove your Supabase credentials from this browser. Your data in Supabase is not deleted — you can reconnect any time.</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-disconnect')">Cancel</button>
+      <button class="btn btn-danger" onclick="disconnectSupabase()">Disconnect</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast"></div>
 
@@ -390,8 +492,8 @@ function getSavedCreds() {
 }
 
 async function connectSupabase(url, key) {
-  url = "https://lhynjoucgjqryyxuypng.supabase.co";
-  key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoeW5qb3VjZ2pxcnl5eHV5cG5nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjEzNTcsImV4cCI6MjA5NzI5NzM1N30.CTjeJ1NQklBHUo5s6yOPTmhgjn6BIubScL5e3l4Usuw";
+  url = url || document.getElementById('setup-url').value.trim();
+  key = key || document.getElementById('setup-key').value.trim();
   const errEl = document.getElementById('setup-error');
   if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
   if (!url || !key) { showSetupError('Please enter both your Project URL and anon key.'); return; }
@@ -421,8 +523,25 @@ function showSetupError(msg) {
   el.style.display = 'block';
 }
 
+function disconnectSupabase() {
+  localStorage.removeItem(SB_URL_KEY);
+  localStorage.removeItem(SB_KEY_KEY);
+  sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  sb = null;
+  closeModal('modal-disconnect');
+  showSetupScreen();
+}
+
+function showSetupScreen() {
+  document.getElementById('setup-screen').classList.add('active');
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('nav-tabs').style.display = 'none';
+  document.getElementById('nav-admin-area').innerHTML =
+    `<button class="btn btn-ghost btn-sm" onclick="openModal('modal-disconnect')" style="opacity:0.5;pointer-events:none;">⚙ DB</button>`;
+}
 
 function showApp() {
+  document.getElementById('setup-screen').classList.remove('active');
   document.getElementById('main-app').style.display = 'block';
   document.getElementById('nav-tabs').style.display = 'flex';
   renderAdminNav();
