@@ -366,7 +366,7 @@ create policy "public insert rsvps" on rsvps for insert with check (true);</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-create')">Cancel</button>
-      <button class="btn btn-primary" id="create-event-btn" onclick="createEvent()">Create Event</button>
+      <button class="btn btn-primary" id="create-event-btn" onclick="createNewEvent()">Create Event</button>
     </div>
   </div>
 </div>
@@ -865,7 +865,7 @@ document.getElementById('color-pick').addEventListener('click', ev => {
   document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s === swatch));
 });
 
-async function createEvent() {
+async function createNewEvent() {
 
   const title = document.getElementById('new-title').value.trim();
   if (!title) { showToast('Please enter an event name.', true); return; }
