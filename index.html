@@ -741,20 +741,14 @@ async function renderHostDashboard() {
 
   const grid = document.getElementById('host-events-grid');
   const empty = document.getElementById('host-empty');
- console.log('host-empty =', empty);
- if (!empty) {
-  console.error('Missing #host-empty element');
-  return;
-}
+
   if (!allEvents.length) {
-    grid.innerHTML = '';
-    empty.style.display = '';
-    grid.appendChild(empty);
-    return;
+  empty.style.display = 'block';
+  grid.querySelectorAll('.event-card').forEach(el => el.remove());
+  return;
   }
 
-  empty.style.display = 'none';
-  grid.innerHTML = allEvents.map(e => eventCardHTML(e, 'host')).join('');
+empty.style.display = 'none';
 }
 
 async function renderPublicEvents(filter = '') {
