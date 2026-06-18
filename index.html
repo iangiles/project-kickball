@@ -208,9 +208,9 @@
 <nav>
   <div class="logo">gather<span>.</span></div>
   <div class="nav-tabs" id="nav-tabs" style="display:none;">
-    <button class="nav-tab active" onclick="switchView('host')">Events</button>
-    <button class="nav-tab" onclick="switchView('public')">Browse</button>
-    <button class="nav-tab" onclick="switchView('mine')">My Events</button>
+    <button class="nav-tab active" id="nav-tab-host" onclick="switchView('host')" style="display:none;">Events</button>
+    <button class="nav-tab" id="nav-tab-public" onclick="switchView('public')">Browse</button>
+    <button class="nav-tab" id="nav-tab-mine" onclick="switchView('mine')">My Events</button>
   </div>
   <div style="display:flex;align-items:center;gap:14px;">
     <div class="nav-user-area" id="nav-user-area"></div>
@@ -645,7 +645,7 @@ function showApp() {
   const urlParams = new URLSearchParams(location.search);
   const linked = urlParams.get('event');
   if (linked) { showDetail(linked, 'public'); }
-  else { switchView('host'); }
+  else { switchView(isAdminLoggedIn() ? 'host' : 'public'); }
 }
 
 function copySql() {
@@ -901,6 +901,17 @@ function renderAdminNav() {
   } else {
     el.innerHTML = `<button class="btn btn-ghost" onclick="requireAdmin(()=>{})">🔒 Admin Sign In</button>`;
   }
+  updateNavTabVisibility();
+}
+
+function updateNavTabVisibility() {
+  const hostTab = document.getElementById('nav-tab-host');
+  const admin = isAdminLoggedIn();
+  hostTab.style.display = admin ? '' : 'none';
+  // If a non-admin is currently viewing the Events tab (e.g. just signed out), bounce to Browse
+  if (!admin && currentView === 'host') {
+    switchView('public');
+  }
 }
 
 function renderAdminPromptBar() {
@@ -924,7 +935,9 @@ function switchView(v) {
   currentView = v;
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + v).classList.add('active');
-  document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', (i===0&&v==='host')||(i===1&&v==='public')||(i===2&&v==='mine')));
+  document.querySelectorAll('.nav-tabs .nav-tab').forEach(t => t.classList.remove('active'));
+  const tabMap = { host: 'nav-tab-host', public: 'nav-tab-public', mine: 'nav-tab-mine' };
+  if (tabMap[v]) document.getElementById(tabMap[v]).classList.add('active');
   if (v === 'host') renderHostDashboard();
   if (v === 'public') renderPublicEvents();
   if (v === 'mine') renderMyEvents();
