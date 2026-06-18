@@ -329,8 +329,8 @@ alter table items add column if not exists claimed_by_user_id uuid references au
       <div class="empty-state" id="host-empty" style="display:none;">
         <div class="icon">🎉</div>
         <h3>No events yet</h3>
-        <p>Create your first event to get started.</p>
-        <button class="btn btn-primary" onclick="requireAdmin(openCreateModal)">+ Create Event</button>
+        <p id="host-empty-msg">Create your first event to get started.</p>
+        <button class="btn btn-primary" id="host-empty-create-btn" onclick="requireAdmin(openCreateModal)" style="display:none;">+ Create Event</button>
       </div>
     </div>
   </div>
@@ -978,15 +978,27 @@ async function renderHostDashboard() {
 
   const grid = document.getElementById('host-events-grid');
   const empty = document.getElementById('host-empty');
+  const emptyBtn = document.getElementById('host-empty-create-btn');
+  const emptyMsg = document.getElementById('host-empty-msg');
 
   if (!allEvents.length) {
-  empty.style.display = '';
-  grid.innerHTML = '';
-  return;
+    // Remove any rendered event cards but keep the empty-state element intact
+    [...grid.children].forEach(child => { if (child !== empty) child.remove(); });
+    empty.style.display = '';
+    if (isAdminLoggedIn()) {
+      emptyMsg.textContent = 'Create your first event to get started.';
+      emptyBtn.style.display = '';
+    } else {
+      emptyMsg.textContent = 'No events have been created yet. Check back soon!';
+      emptyBtn.style.display = 'none';
+    }
+    return;
   }
 
   empty.style.display = 'none';
   grid.innerHTML = allEvents.map(e => eventCardHTML(e, 'host')).join('');
+  // Re-attach the empty-state element since innerHTML replaced it
+  grid.appendChild(empty);
 }
 
 async function renderPublicEvents(filter = '') {
