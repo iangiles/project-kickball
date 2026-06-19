@@ -226,7 +226,7 @@
 <nav>
   <div class="logo">gather<span>.</span></div>
   <div class="nav-tabs" id="nav-tabs" style="display:none;">
-    <button class="nav-tab active" id="nav-tab-host" onclick="switchView('host')" style="display:none;">Events</button>
+    <button class="nav-tab active" id="nav-tab-host" onclick="switchView('host')" style="display:none;">Event Manager</button>
     <button class="nav-tab" id="nav-tab-public" onclick="switchView('public')">Browse</button>
     <button class="nav-tab" id="nav-tab-mine" onclick="switchView('mine')">My Events</button>
   </div>
@@ -343,8 +343,8 @@ create policy "users update own rsvps" on rsvps for update using (auth.uid() = u
   <div id="view-host" class="view active">
     <div class="dashboard-header">
       <div>
-        <h1>Your Events</h1>
-        <p>Manage gatherings, see who's coming, track what's needed.</p>
+        <h1>Event Manager</h1>
+        <p>Create, edit and manage your gatherings.</p>
       </div>
       <div id="host-create-btn"></div>
     </div>
@@ -430,6 +430,39 @@ create policy "users update own rsvps" on rsvps for update using (auth.uid() = u
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-create')">Cancel</button>
       <button class="btn btn-primary" id="create-event-btn" onclick="createNewEvent()">Create Event</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT EVENT MODAL -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <h2>Edit Event</h2>
+    <p class="modal-sub" id="edit-modal-sub">Update the details below.</p>
+    <div class="form-group"><label>Event Name</label><input type="text" id="edit-title" placeholder="Summer Potluck at the Park"></div>
+    <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="edit-datetime"></div>
+    <div class="form-group"><label>Location</label><input type="text" id="edit-location" placeholder="Volunteer Park, Seattle"></div>
+    <div class="form-group"><label>Description</label><textarea id="edit-desc" placeholder="Tell guests what to expect…"></textarea></div>
+    <div class="form-group">
+      <label>Color Theme</label>
+      <div class="color-pick" id="edit-color-pick">
+        <div class="color-swatch selected" data-color="#F59E0B" style="background:#F59E0B"></div>
+        <div class="color-swatch" data-color="#F43F5E" style="background:#F43F5E"></div>
+        <div class="color-swatch" data-color="#6366F1" style="background:#6366F1"></div>
+        <div class="color-swatch" data-color="#06B6D4" style="background:#06B6D4"></div>
+        <div class="color-swatch" data-color="#10B981" style="background:#10B981"></div>
+        <div class="color-swatch" data-color="#8B5CF6" style="background:#8B5CF6"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Items Guests Can Bring</label>
+      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">Existing claimed items are shown but can't be removed. Unclaimed items can be deleted or renamed.</p>
+      <div class="items-builder" id="edit-items-builder"></div>
+      <button class="add-item-btn" onclick="addEditItemRow()">+ Add item</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit')">Cancel</button>
+      <button class="btn btn-primary" id="edit-event-btn" onclick="saveEditedEvent()">Save Changes</button>
     </div>
   </div>
 </div>
@@ -1134,7 +1167,7 @@ function eventCardHTML(e, context, mineInfo) {
     if (tags.length) tagsHtml = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">${tags.join('')}</div>`;
   }
   return `<div class="event-card" style="--accent:${e.color||'#F59E0B'}" onclick="showDetail('${e.id}','${context==='mine'?'mine':context}')">
-    <div class="event-card-label">${context==='host'?'📌 Hosted Event':context==='mine'?'⭐ Your Event':'🎟 Open Event'}</div>
+    <div class="event-card-label">${context==='host'?'📌 Managed Event':context==='mine'?'⭐ Your Event':'🎟 Open Event'}</div>
     <h3>${esc(e.title)}</h3>
     <div class="event-card-meta">
       <span>📅 ${date}${time?' · '+time:''}</span>
@@ -1142,8 +1175,11 @@ function eventCardHTML(e, context, mineInfo) {
     </div>
     ${tagsHtml}
     <div class="event-card-footer">
-      <div class="rsvp-count"><span>Click to view RSVPs & items</span></div>
-      <button class="btn btn-ghost btn-sm">View →</button>
+      <div class="rsvp-count"><span>Click to view details</span></div>
+      <div style="display:flex;gap:6px;">
+        ${context==='host' && isAdminLoggedIn() ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditModal('${e.id}')">✏️ Edit</button>` : ''}
+        <button class="btn btn-ghost btn-sm">View →</button>
+      </div>
     </div>
   </div>`;
 }
@@ -1267,6 +1303,150 @@ async function createNewEvent() {
     showToast('Error creating event: ' + e.message, true);
   } finally {
     setBtnLoading('create-event-btn', false);
+  }
+}
+
+document.getElementById('edit-color-pick').addEventListener('click', ev => {
+  const swatch = ev.target.closest('.color-swatch');
+  if (!swatch) return;
+  editSelectedColor = swatch.dataset.color;
+  document.querySelectorAll('#edit-color-pick .color-swatch').forEach(s => s.classList.toggle('selected', s === swatch));
+});
+
+// ─── EDIT EVENT ───────────────────────────────────────────────────
+let editEventId = null;
+let editSelectedColor = '#F59E0B';
+let editOriginalItems = []; // items as they exist in DB when modal opened
+
+async function openEditModal(eventId) {
+  editEventId = eventId;
+  showLoading('Loading event…');
+  try {
+    const [evRes, itemRes] = await Promise.all([
+      sb.from('events').select('*').eq('id', eventId).single(),
+      sb.from('items').select('*').eq('event_id', eventId).order('sort_order')
+    ]);
+    if (evRes.error) throw evRes.error;
+    hideLoading();
+
+    const e = evRes.data;
+    editOriginalItems = itemRes.data || [];
+
+    // Populate fields
+    document.getElementById('edit-title').value = e.title || '';
+    document.getElementById('edit-datetime').value = e.datetime
+      ? new Date(e.datetime).toISOString().slice(0, 16) : '';
+    document.getElementById('edit-location').value = e.location || '';
+    document.getElementById('edit-desc').value = e.description || '';
+    document.getElementById('edit-modal-sub').textContent = `Editing: ${e.title}`;
+
+    // Color
+    editSelectedColor = e.color || '#F59E0B';
+    document.querySelectorAll('#edit-color-pick .color-swatch').forEach(s =>
+      s.classList.toggle('selected', s.dataset.color === editSelectedColor));
+
+    // Items
+    const builder = document.getElementById('edit-items-builder');
+    builder.innerHTML = '';
+    editOriginalItems.forEach(it => addEditItemRow(it));
+
+    openModal('modal-edit');
+  } catch(err) {
+    hideLoading();
+    showToast('Error loading event: ' + err.message, true);
+  }
+}
+
+function addEditItemRow(existing) {
+  const row = document.createElement('div');
+  row.className = 'item-builder-row';
+  const isClaimed = existing && existing.claimed_by;
+  row.dataset.itemId = existing ? existing.id : '';
+  row.innerHTML = `
+    <input type="text" placeholder="Item name" value="${existing ? esc(existing.name) : ''}" ${isClaimed ? 'title="This item has been claimed and cannot be renamed"' : ''}>
+    <input type="number" class="qty" value="${existing ? existing.qty : 1}" min="1" placeholder="Qty">
+    <button class="remove-item-btn" onclick="removeEditItemRow(this, ${isClaimed})" title="${isClaimed ? 'Cannot remove — already claimed by ' + esc(existing.claimed_by) : 'Remove item'}">×</button>`;
+  if (isClaimed) {
+    row.style.opacity = '0.6';
+    row.querySelector('input[type=text]').disabled = true;
+    row.querySelector('.qty').disabled = true;
+  }
+  document.getElementById('edit-items-builder').appendChild(row);
+}
+
+function removeEditItemRow(btn, isClaimed) {
+  if (isClaimed) { showToast('This item has been claimed and can\'t be removed.', true); return; }
+  btn.parentElement.remove();
+}
+
+async function saveEditedEvent() {
+  const title = document.getElementById('edit-title').value.trim();
+  if (!title) { showToast('Please enter an event name.', true); return; }
+
+  setBtnLoading('edit-event-btn', true);
+  try {
+    // 1. Update core event fields
+    const { error: evErr } = await sb.from('events').update({
+      title,
+      datetime: document.getElementById('edit-datetime').value || null,
+      location: document.getElementById('edit-location').value.trim() || null,
+      description: document.getElementById('edit-desc').value.trim() || null,
+      color: editSelectedColor
+    }).eq('id', editEventId);
+    if (evErr) throw evErr;
+
+    // 2. Reconcile items
+    const rows = [...document.querySelectorAll('#edit-items-builder .item-builder-row')];
+    const currentRowIds = new Set();
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const itemId = row.dataset.itemId;
+      const nameInput = row.querySelector('input[type=text]');
+      const name = nameInput.value.trim();
+      const qty = parseInt(row.querySelector('.qty').value) || 1;
+      const isClaimed = nameInput.disabled; // disabled = claimed, skip name update
+
+      if (itemId) {
+        currentRowIds.add(itemId);
+        if (!isClaimed) {
+          // Update existing unclaimed item
+          const { error } = await sb.from('items').update({ name, qty, sort_order: i }).eq('id', itemId);
+          if (error) throw error;
+        } else {
+          // Update only sort_order for claimed items
+          const { error } = await sb.from('items').update({ sort_order: i }).eq('id', itemId);
+          if (error) throw error;
+        }
+      } else if (name) {
+        // Insert new item
+        const { error } = await sb.from('items').insert({
+          event_id: editEventId, name, qty, sort_order: i, claimed_by: null
+        });
+        if (error) throw error;
+      }
+    }
+
+    // 3. Delete items removed from the list (only unclaimed ones — UI prevents removing claimed)
+    const removedItems = editOriginalItems.filter(it => !currentRowIds.has(it.id) && !it.claimed_by);
+    for (const it of removedItems) {
+      const { error } = await sb.from('items').delete().eq('id', it.id);
+      if (error) throw error;
+    }
+
+    closeModal('modal-edit');
+    showToast('Event updated ✓');
+    renderHostDashboard();
+
+    // If currently viewing this event's detail page, refresh it too
+    if (currentEventId === editEventId) {
+      await loadEventDetail(editEventId);
+      renderDetail();
+    }
+  } catch(err) {
+    showToast('Error saving event: ' + err.message, true);
+  } finally {
+    setBtnLoading('edit-event-btn', false);
   }
 }
 
