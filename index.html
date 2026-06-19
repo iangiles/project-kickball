@@ -993,16 +993,24 @@ async function submitChangeAccountPassword() {
 
   setBtnLoading('change-pw-submit-btn', true);
   try {
-    // Re-authenticate with the current password to confirm identity before changing it
-    const { error: signInErr } = await sb.auth.signInWithPassword({ email: currentUser.email, password: currentPw });
-    if (signInErr) {
-      document.getElementById('change-pw-current-error').textContent = 'Incorrect current password.';
-      document.getElementById('change-pw-current-error').classList.add('show');
+    // Supabase's "Secure password change" setting (if enabled on the project)
+    // requires the current password to be passed directly to updateUser()
+    // via the `currentPassword` field, rather than verified separately.
+    const { error: updateErr } = await sb.auth.updateUser({
+      password: newPw,
+      currentPassword: currentPw
+    });
+
+    if (updateErr) {
+      const msg = (updateErr.message || '').toLowerCase();
+      if (msg.includes('current password') || msg.includes('reauthenticat') || msg.includes('invalid login')) {
+        document.getElementById('change-pw-current-error').textContent = 'Incorrect current password.';
+        document.getElementById('change-pw-current-error').classList.add('show');
+      } else {
+        throw updateErr;
+      }
       return;
     }
-
-    const { error: updateErr } = await sb.auth.updateUser({ password: newPw });
-    if (updateErr) throw updateErr;
 
     closeModal('modal-change-account-pw');
     showToast('Password updated ✓');
