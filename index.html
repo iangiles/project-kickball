@@ -993,21 +993,24 @@ async function submitChangeAccountPassword() {
 
   setBtnLoading('change-pw-submit-btn', true);
   try {
-    // Supabase's "Secure password change" setting (if enabled on the project)
-    // requires the current password to be passed directly to updateUser()
-    // via the `currentPassword` field, rather than verified separately.
+    // Supabase's "Require current password when changing password" setting
+    // expects the field as `current_password` (snake_case) on updateUser().
     const { error: updateErr } = await sb.auth.updateUser({
       password: newPw,
-      currentPassword: currentPw
+      current_password: currentPw
     });
 
     if (updateErr) {
       const msg = (updateErr.message || '').toLowerCase();
-      if (msg.includes('current password') || msg.includes('reauthenticat') || msg.includes('invalid login')) {
+      if (msg.includes('should be different') || msg.includes('same as')) {
+        document.getElementById('change-pw-generic-error').textContent = 'New password must be different from your current password.';
+        document.getElementById('change-pw-generic-error').classList.add('show');
+      } else if (msg.includes('current_password') || msg.includes('current password') || msg.includes('invalid login credentials')) {
         document.getElementById('change-pw-current-error').textContent = 'Incorrect current password.';
         document.getElementById('change-pw-current-error').classList.add('show');
       } else {
-        throw updateErr;
+        document.getElementById('change-pw-generic-error').textContent = updateErr.message || 'Unknown error';
+        document.getElementById('change-pw-generic-error').classList.add('show');
       }
       return;
     }
