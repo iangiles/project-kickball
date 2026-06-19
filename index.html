@@ -97,6 +97,28 @@
   .dashboard-header h1 { font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 600; line-height: 1.1; }
   .dashboard-header p { color: var(--muted); margin-top: 4px; font-size: 0.9rem; }
   .events-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+
+  /* PAST EVENTS */
+  .past-events-section { margin-top: 36px; }
+  .past-events-toggle {
+    display: flex; align-items: center; gap: 8px;
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-family: 'Inter', sans-serif;
+    font-size: 0.92rem; font-weight: 600; padding: 10px 0;
+    width: 100%; border-top: 1px solid var(--border);
+    transition: color 0.15s;
+  }
+  .past-events-toggle:hover { color: var(--cream); }
+  .past-events-toggle .chevron { transition: transform 0.2s; font-size: 0.75rem; }
+  .past-events-toggle.open .chevron { transform: rotate(90deg); }
+  .past-events-toggle .count-pill {
+    background: var(--card); color: var(--muted); font-size: 0.72rem; font-weight: 600;
+    padding: 2px 9px; border-radius: 99px; margin-left: 2px;
+  }
+  .past-events-body { display: none; margin-top: 18px; }
+  .past-events-body.open { display: block; }
+  .past-events-body .event-card { opacity: 0.72; }
+  .past-events-body .event-card:hover { opacity: 1; }
   .event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; cursor: pointer; transition: border-color 0.15s, transform 0.15s; position: relative; overflow: hidden; }
   .event-card:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
   .event-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent, var(--amber)); }
@@ -357,6 +379,7 @@ create policy "users update own rsvps" on rsvps for update using (auth.uid() = u
         <button class="btn btn-primary" id="host-empty-create-btn" onclick="requireAdmin(openCreateModal)" style="display:none;">+ Create Event</button>
       </div>
     </div>
+    <div id="host-past-section"></div>
   </div>
 
   <!-- PUBLIC VIEW -->
@@ -366,6 +389,7 @@ create policy "users update own rsvps" on rsvps for update using (auth.uid() = u
     </div>
     <input class="search-bar" type="text" placeholder="Search events by name or location…" oninput="filterPublicEvents(this.value)">
     <div id="public-events-grid" class="events-grid"></div>
+    <div id="public-past-section"></div>
   </div>
 
   <!-- MY EVENTS VIEW -->
@@ -374,6 +398,7 @@ create policy "users update own rsvps" on rsvps for update using (auth.uid() = u
       <div><h1>My Events</h1><p>Everything you've RSVP'd to or signed up to bring something for.</p></div>
     </div>
     <div id="mine-content"></div>
+    <div id="mine-past-section"></div>
   </div>
 
   <!-- DETAIL VIEW -->
@@ -601,6 +626,43 @@ create policy "users update own rsvps" on rsvps for update using (auth.uid() = u
   </div>
 </div>
 
+<!-- CHANGE ACCOUNT PASSWORD MODAL -->
+<div class="modal-overlay" id="modal-change-account-pw">
+  <div class="modal" style="max-width:400px;">
+    <h2>Change Password</h2>
+    <p class="modal-sub">Update the password for your account (<span id="change-pw-email" style="color:var(--cream);"></span>).</p>
+    <div class="form-group">
+      <label>Current Password</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="change-pw-current" placeholder="Your current password">
+        <button class="pw-toggle" onclick="togglePw('change-pw-current',this)" tabindex="-1">👁</button>
+      </div>
+      <div class="form-error" id="change-pw-current-error">Incorrect current password.</div>
+    </div>
+    <div class="form-group">
+      <label>New Password</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="change-pw-new" placeholder="Choose a new password">
+        <button class="pw-toggle" onclick="togglePw('change-pw-new',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Confirm New Password</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="change-pw-confirm" placeholder="Repeat the new password" onkeydown="if(event.key==='Enter')submitChangeAccountPassword()">
+        <button class="pw-toggle" onclick="togglePw('change-pw-confirm',this)" tabindex="-1">👁</button>
+      </div>
+      <div class="form-error" id="change-pw-match-error">Passwords don't match.</div>
+      <div class="form-error" id="change-pw-empty-error">Password cannot be empty.</div>
+      <div class="form-error" id="change-pw-generic-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-change-account-pw')">Cancel</button>
+      <button class="btn btn-primary" id="change-pw-submit-btn" onclick="submitChangeAccountPassword()">Update Password</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -754,6 +816,45 @@ function dtToInputVal(dtStr) {
   return dtStr.slice(0, 16); // "YYYY-MM-DDTHH:MM"
 }
 
+// An event with no date set is always treated as upcoming (never "past")
+function isPastEvent(e) {
+  if (!e.datetime) return false;
+  const eventTime = parseLocalDt(e.datetime);
+  return eventTime && eventTime.getTime() < Date.now();
+}
+function splitUpcomingPast(events) {
+  const upcoming = [], past = [];
+  events.forEach(e => (isPastEvent(e) ? past : upcoming).push(e));
+  // Past events read better most-recent-first
+  past.sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
+  return { upcoming, past };
+}
+
+// Renders a collapsible "Past Events" section into the given container.
+// cardBuilder(event) should return the HTML string for one event card.
+function renderPastSection(containerId, pastEvents, cardBuilder, toggleKey) {
+  const container = document.getElementById(containerId);
+  if (!pastEvents.length) { container.innerHTML = ''; return; }
+  const wasOpen = pastSectionOpenState[toggleKey] === true;
+  container.innerHTML = `
+    <div class="past-events-section">
+      <button class="past-events-toggle${wasOpen ? ' open' : ''}" onclick="togglePastSection('${toggleKey}')">
+        <span class="chevron">▶</span> Past Events <span class="count-pill">${pastEvents.length}</span>
+      </button>
+      <div class="past-events-body${wasOpen ? ' open' : ''}" id="past-body-${toggleKey}">
+        <div class="events-grid">${pastEvents.map(cardBuilder).join('')}</div>
+      </div>
+    </div>`;
+}
+const pastSectionOpenState = {};
+function togglePastSection(key) {
+  pastSectionOpenState[key] = !pastSectionOpenState[key];
+  const toggle = document.querySelector(`.past-events-toggle[onclick="togglePastSection('${key}')"]`);
+  const body = document.getElementById('past-body-' + key);
+  toggle.classList.toggle('open', pastSectionOpenState[key]);
+  body.classList.toggle('open', pastSectionOpenState[key]);
+}
+
 // ─── USER ACCOUNTS ────────────────────────────────────────────────
 let currentUser = null; // Supabase auth user object, or null
 
@@ -789,6 +890,7 @@ function renderUserNav() {
   if (currentUser) {
     el.innerHTML = `
       <span class="user-chip"><span class="avatar-sm">${userInitial()}</span>${esc(userDisplayName())}</span>
+      <button class="change-pw-link" onclick="openChangeAccountPasswordModal()">Change password</button>
       <button class="btn-logout" onclick="userSignOut()">Sign out</button>`;
   } else {
     el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="openAuthModal('login')">Sign In</button>`;
@@ -863,6 +965,53 @@ async function userSignOut() {
   if (currentView === 'mine') renderMyEvents();
   showToast('Signed out.');
   closeNavMenu();
+}
+
+function openChangeAccountPasswordModal() {
+  if (!currentUser) return;
+  document.getElementById('change-pw-email').textContent = currentUser.email;
+  ['change-pw-current','change-pw-new','change-pw-confirm'].forEach(id => document.getElementById(id).value = '');
+  ['change-pw-current-error','change-pw-match-error','change-pw-empty-error','change-pw-generic-error'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('show');
+    el.textContent = id === 'change-pw-current-error' ? 'Incorrect current password.'
+      : id === 'change-pw-match-error' ? "Passwords don't match."
+      : id === 'change-pw-empty-error' ? 'Password cannot be empty.' : '';
+  });
+  openModal('modal-change-account-pw');
+}
+
+async function submitChangeAccountPassword() {
+  const currentPw = document.getElementById('change-pw-current').value;
+  const newPw = document.getElementById('change-pw-new').value;
+  const confirmPw = document.getElementById('change-pw-confirm').value;
+  ['change-pw-current-error','change-pw-match-error','change-pw-empty-error','change-pw-generic-error'].forEach(id => document.getElementById(id).classList.remove('show'));
+
+  if (!currentPw) { document.getElementById('change-pw-current-error').textContent = 'Please enter your current password.'; document.getElementById('change-pw-current-error').classList.add('show'); return; }
+  if (!newPw) { document.getElementById('change-pw-empty-error').classList.add('show'); return; }
+  if (newPw !== confirmPw) { document.getElementById('change-pw-match-error').classList.add('show'); return; }
+
+  setBtnLoading('change-pw-submit-btn', true);
+  try {
+    // Re-authenticate with the current password to confirm identity before changing it
+    const { error: signInErr } = await sb.auth.signInWithPassword({ email: currentUser.email, password: currentPw });
+    if (signInErr) {
+      document.getElementById('change-pw-current-error').textContent = 'Incorrect current password.';
+      document.getElementById('change-pw-current-error').classList.add('show');
+      return;
+    }
+
+    const { error: updateErr } = await sb.auth.updateUser({ password: newPw });
+    if (updateErr) throw updateErr;
+
+    closeModal('modal-change-account-pw');
+    showToast('Password updated ✓');
+  } catch(e) {
+    document.getElementById('change-pw-generic-error').textContent = e.message || 'Something went wrong.';
+    document.getElementById('change-pw-generic-error').classList.add('show');
+  } finally {
+    setBtnLoading('change-pw-submit-btn', false);
+  }
 }
 
 
@@ -1084,29 +1233,32 @@ async function renderHostDashboard() {
   }
   hideLoading();
 
+  const { upcoming, past } = splitUpcomingPast(allEvents);
+
   const grid = document.getElementById('host-events-grid');
   const empty = document.getElementById('host-empty');
   const emptyBtn = document.getElementById('host-empty-create-btn');
   const emptyMsg = document.getElementById('host-empty-msg');
 
-  if (!allEvents.length) {
+  if (!upcoming.length) {
     // Remove any rendered event cards but keep the empty-state element intact
     [...grid.children].forEach(child => { if (child !== empty) child.remove(); });
     empty.style.display = '';
     if (isAdminLoggedIn()) {
-      emptyMsg.textContent = 'Create your first event to get started.';
+      emptyMsg.textContent = allEvents.length ? 'No upcoming events — see past events below, or create a new one.' : 'Create your first event to get started.';
       emptyBtn.style.display = '';
     } else {
-      emptyMsg.textContent = 'No events have been created yet. Check back soon!';
+      emptyMsg.textContent = allEvents.length ? 'No upcoming events — see past events below.' : 'No events have been created yet. Check back soon!';
       emptyBtn.style.display = 'none';
     }
-    return;
+  } else {
+    empty.style.display = 'none';
+    grid.innerHTML = upcoming.map(e => eventCardHTML(e, 'host')).join('');
+    // Re-attach the empty-state element since innerHTML replaced it
+    grid.appendChild(empty);
   }
 
-  empty.style.display = 'none';
-  grid.innerHTML = allEvents.map(e => eventCardHTML(e, 'host')).join('');
-  // Re-attach the empty-state element since innerHTML replaced it
-  grid.appendChild(empty);
+  renderPastSection('host-past-section', past, e => eventCardHTML(e, 'host'), 'host');
 }
 
 async function renderPublicEvents(filter = '') {
@@ -1116,10 +1268,14 @@ async function renderPublicEvents(filter = '') {
   const filtered = filter
     ? allEvents.filter(e => e.title.toLowerCase().includes(filter.toLowerCase()) || (e.location||'').toLowerCase().includes(filter.toLowerCase()))
     : allEvents;
+  const { upcoming, past } = splitUpcomingPast(filtered);
+
   const grid = document.getElementById('public-events-grid');
-  grid.innerHTML = filtered.length
-    ? filtered.map(e => eventCardHTML(e, 'public')).join('')
-    : '<div class="empty-state"><div class="icon">🔍</div><h3>No events found</h3><p>Try a different search or check back later.</p></div>';
+  grid.innerHTML = upcoming.length
+    ? upcoming.map(e => eventCardHTML(e, 'public')).join('')
+    : `<div class="empty-state"><div class="icon">🔍</div><h3>No upcoming events found</h3><p>${past.length ? 'See past events below.' : 'Try a different search or check back later.'}</p></div>`;
+
+  renderPastSection('public-past-section', past, e => eventCardHTML(e, 'public'), 'public');
 }
 
 function filterPublicEvents(v) { renderPublicEvents(v); }
@@ -1127,6 +1283,7 @@ function filterPublicEvents(v) { renderPublicEvents(v); }
 // ─── MY EVENTS ────────────────────────────────────────────────────
 async function renderMyEvents() {
   const container = document.getElementById('mine-content');
+  const pastContainer = document.getElementById('mine-past-section');
   if (!currentUser) {
     container.innerHTML = `<div class="empty-state">
       <div class="icon">🔐</div>
@@ -1134,6 +1291,7 @@ async function renderMyEvents() {
       <p>Create an account or sign in to track everything you've RSVP'd to or signed up to bring.</p>
       <button class="btn btn-primary" onclick="openAuthModal('login')">Sign In</button>
     </div>`;
+    pastContainer.innerHTML = '';
     return;
   }
 
@@ -1161,19 +1319,25 @@ async function renderMyEvents() {
         <p>RSVP to an event or sign up to bring something, and it'll show up here.</p>
         <button class="btn btn-primary" onclick="switchView('public')">Browse Events</button>
       </div>`;
+      pastContainer.innerHTML = '';
       return;
     }
 
     const { data: events, error: evErr } = await sb.from('events').select('*').in('id', eventIds).order('datetime', { ascending: true });
     if (evErr) throw evErr;
 
-    container.innerHTML = `<div class="events-grid">${events.map(e => eventCardHTML(e, 'mine', {
-      rsvpStatus: rsvpByEvent[e.id],
-      items: itemsByEvent[e.id] || []
-    })).join('')}</div>`;
+    const mineInfoFor = e => ({ rsvpStatus: rsvpByEvent[e.id], items: itemsByEvent[e.id] || [] });
+    const { upcoming, past } = splitUpcomingPast(events);
+
+    container.innerHTML = upcoming.length
+      ? `<div class="events-grid">${upcoming.map(e => eventCardHTML(e, 'mine', mineInfoFor(e))).join('')}</div>`
+      : `<div class="empty-state"><div class="icon">🗓️</div><h3>No upcoming events</h3><p>${past.length ? 'See your past events below.' : "RSVP to an event or sign up to bring something, and it'll show up here."}</p></div>`;
+
+    renderPastSection('mine-past-section', past, e => eventCardHTML(e, 'mine', mineInfoFor(e)), 'mine');
   } catch(e) {
     hideLoading();
     container.innerHTML = '';
+    pastContainer.innerHTML = '';
     showToast('Error loading your events: ' + e.message, true);
   }
 }
