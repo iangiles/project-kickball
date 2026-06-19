@@ -726,6 +726,34 @@ let selectedColor = '#F59E0B';
 let currentView = 'host';
 let fromView = 'host';
 
+// ─── DATETIME HELPERS ─────────────────────────────────────────────
+// Supabase stores datetimes as timestamptz. When we insert a value from
+// a datetime-local input (e.g. "2025-07-04T18:00") without a timezone,
+// Postgres assumes UTC. On read, Supabase returns an ISO string with a
+// UTC offset (e.g. "2025-07-04T18:00:00+00:00"). Passing that directly
+// to new Date() converts it to the browser's local time, causing a shift.
+//
+// Fix: strip everything from the "T" offset onwards so new Date() parses
+// it as a local (not UTC) datetime — matching exactly what the user typed.
+function parseLocalDt(dtStr) {
+  if (!dtStr) return null;
+  // Trim to "YYYY-MM-DDTHH:MM" — no Z, no +offset — so Date parses as local
+  return new Date(dtStr.slice(0, 16));
+}
+function fmtDate(dtStr, opts) {
+  const d = parseLocalDt(dtStr);
+  return d ? d.toLocaleDateString('en-US', opts) : 'Date TBD';
+}
+function fmtTime(dtStr) {
+  const d = parseLocalDt(dtStr);
+  return d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+}
+// For pre-filling a datetime-local input from a stored value
+function dtToInputVal(dtStr) {
+  if (!dtStr) return '';
+  return dtStr.slice(0, 16); // "YYYY-MM-DDTHH:MM"
+}
+
 // ─── USER ACCOUNTS ────────────────────────────────────────────────
 let currentUser = null; // Supabase auth user object, or null
 
@@ -1151,8 +1179,8 @@ async function renderMyEvents() {
 }
 
 function eventCardHTML(e, context, mineInfo) {
-  const date = e.datetime ? new Date(e.datetime).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : 'Date TBD';
-  const time = e.datetime ? new Date(e.datetime).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+  const date = fmtDate(e.datetime, {weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  const time = fmtTime(e.datetime);
   let tagsHtml = '';
   if (context === 'mine' && mineInfo) {
     const tags = [];
@@ -1191,8 +1219,8 @@ function renderDetail() {
   hero.style.setProperty('--accent', e.color || '#F59E0B');
   document.getElementById('detail-title').textContent = e.title;
 
-  const date = e.datetime ? new Date(e.datetime).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : 'Date TBD';
-  const time = e.datetime ? new Date(e.datetime).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+  const date = fmtDate(e.datetime, {weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const time = fmtTime(e.datetime);
   const yesCount = rsvps.filter(r => r.status === 'yes').length;
 
   document.getElementById('detail-meta').innerHTML = `
@@ -1334,8 +1362,7 @@ async function openEditModal(eventId) {
 
     // Populate fields
     document.getElementById('edit-title').value = e.title || '';
-    document.getElementById('edit-datetime').value = e.datetime
-      ? new Date(e.datetime).toISOString().slice(0, 16) : '';
+    document.getElementById('edit-datetime').value = dtToInputVal(e.datetime);
     document.getElementById('edit-location').value = e.location || '';
     document.getElementById('edit-desc').value = e.description || '';
     document.getElementById('edit-modal-sub').textContent = `Editing: ${e.title}`;
