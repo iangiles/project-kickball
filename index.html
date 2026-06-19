@@ -17,15 +17,33 @@
   body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--cream); min-height: 100vh; display: flex; flex-direction: column; }
 
   /* NAV */
-  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
-  .logo { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 700; color: var(--amber); letter-spacing: -0.5px; }
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; gap: 12px; box-sizing: border-box; }
+  .logo { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 700; color: var(--amber); letter-spacing: -0.5px; flex-shrink: 0; }
   .logo span { color: var(--cream); font-weight: 300; font-style: italic; }
-  .nav-tabs { display: flex; gap: 4px; }
-  .nav-tab { padding: 6px 16px; border-radius: 8px; border: none; background: transparent; color: var(--muted); font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .nav-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+  .nav-tab { padding: 6px 16px; border-radius: 8px; border: none; background: transparent; color: var(--muted); font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
   .nav-tab.active { background: var(--card); color: var(--cream); }
   .nav-tab:hover:not(.active) { color: var(--cream); }
+  .nav-right { display: flex; align-items: center; gap: 14px; }
   .nav-admin-area { display: flex; align-items: center; gap: 10px; }
   .nav-user-area { display: flex; align-items: center; gap: 10px; }
+  .nav-menu-toggle { display: none; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--cream); width: 38px; height: 38px; align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; flex-shrink: 0; }
+
+  @media (max-width: 760px) {
+    nav { padding: 0 16px; flex-wrap: wrap; }
+    .logo { font-size: 1.3rem; }
+    .nav-tabs { order: 3; width: 100%; padding: 8px 0 10px; border-top: 1px solid var(--border); margin-top: 2px; }
+    .nav-menu-toggle { display: flex; }
+    .nav-right { display: none; position: absolute; top: 100%; right: 16px; left: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; flex-direction: column; align-items: stretch; gap: 10px; box-shadow: 0 12px 32px rgba(0,0,0,0.4); z-index: 150; }
+    .nav-right.open { display: flex; }
+    .nav-admin-area, .nav-user-area { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
+    .nav-admin-area > *, .nav-user-area > * { width: 100%; justify-content: center; text-align: center; }
+    .user-chip { justify-content: center; }
+  }
+  @media (max-width: 420px) {
+    .nav-tab { padding: 6px 12px; font-size: 0.82rem; }
+  }
   .user-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 99px; padding: 4px 14px 4px 6px; font-size: 0.82rem; }
   .user-chip .avatar-sm { width: 22px; height: 22px; border-radius: 50%; background: var(--blue); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; flex-shrink: 0; }
   .auth-tabs { display: flex; gap: 4px; background: var(--card); border-radius: 8px; padding: 4px; margin-bottom: 22px; }
@@ -212,7 +230,8 @@
     <button class="nav-tab" id="nav-tab-public" onclick="switchView('public')">Browse</button>
     <button class="nav-tab" id="nav-tab-mine" onclick="switchView('mine')">My Events</button>
   </div>
-  <div style="display:flex;align-items:center;gap:14px;">
+  <button class="nav-menu-toggle" id="nav-menu-toggle" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
+  <div class="nav-right" id="nav-right">
     <div class="nav-user-area" id="nav-user-area"></div>
     <div class="nav-admin-area" id="nav-admin-area"></div>
   </div>
@@ -782,6 +801,7 @@ async function userSignOut() {
   renderUserNav();
   if (currentView === 'mine') renderMyEvents();
   showToast('Signed out.');
+  closeNavMenu();
 }
 
 
@@ -852,6 +872,7 @@ function adminLogout() {
   renderAdminNav();
   renderHostDashboard();
   showToast('Signed out.');
+  closeNavMenu();
 }
 
 let _setPwIsChange = false;
@@ -936,6 +957,13 @@ function togglePw(inputId, btn) {
 }
 
 // ─── VIEWS ────────────────────────────────────────────────────────
+function toggleNavMenu() {
+  document.getElementById('nav-right').classList.toggle('open');
+}
+function closeNavMenu() {
+  document.getElementById('nav-right').classList.remove('open');
+}
+
 function switchView(v) {
   currentView = v;
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
@@ -946,6 +974,7 @@ function switchView(v) {
   if (v === 'host') renderHostDashboard();
   if (v === 'public') renderPublicEvents();
   if (v === 'mine') renderMyEvents();
+  closeNavMenu();
 }
 
 async function showDetail(id, from) {
@@ -1432,6 +1461,15 @@ function showToast(msg, isError) {
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+});
+
+// Close mobile nav menu when clicking outside it
+document.addEventListener('click', e => {
+  const navRight = document.getElementById('nav-right');
+  const toggle = document.getElementById('nav-menu-toggle');
+  if (!navRight.classList.contains('open')) return;
+  if (navRight.contains(e.target) || toggle.contains(e.target)) return;
+  navRight.classList.remove('open');
 });
 
 // ─── INIT ─────────────────────────────────────────────────────────
