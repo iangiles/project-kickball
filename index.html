@@ -1588,8 +1588,9 @@ function renderDetail() {
   document.getElementById('rsvp-count-badge').textContent = `(${rsvps.length})`;
   const rsvpList = document.getElementById('rsvp-list');
   const isAdmin = isAdminLoggedIn();
-  rsvpList.innerHTML = rsvps.length
-    ? rsvps.map(r => `<div class="rsvp-item">
+  const sortedRsvps = [...rsvps].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  rsvpList.innerHTML = sortedRsvps.length
+    ? sortedRsvps.map(r => `<div class="rsvp-item">
         <div class="avatar">${r.name[0].toUpperCase()}</div>
         <span class="name">${esc(r.name)}</span>
         ${r.note?`<span style="color:var(--muted);font-size:0.78rem;font-style:italic">"${esc(r.note)}"</span>`:''}
