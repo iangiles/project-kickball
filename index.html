@@ -1097,12 +1097,16 @@ function userInitial() {
   return n ? n[0].toUpperCase() : '?';
 }
 
+function userAvatarColor() {
+  return currentUser?.user_metadata?.avatar_color || '#F59E0B';
+}
+
 function renderUserNav() {
   const el = document.getElementById('nav-user-area');
   if (currentUser) {
     el.innerHTML = `
       <button class="user-chip" style="cursor:pointer;border:1px solid var(--border);" onclick="switchView('account-settings')">
-        <span class="avatar-sm">${userInitial()}</span>${esc(userDisplayName())}
+        <span class="avatar-sm" style="background:${esc(userAvatarColor())};">${userInitial()}</span>${esc(userDisplayName())}
       </button>`;
   } else {
     el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="switchView('account-settings')">Sign In</button>`;
@@ -1485,7 +1489,20 @@ async function loadEventDetail(id) {
     sb.from('rsvps').select('*').eq('event_id', id).order('created_at')
   ]);
   if (evRes.error) throw evRes.error;
-  currentEventData = { event: evRes.data, items: itemRes.data || [], rsvps: rsvpRes.data || [] };
+  const rsvps = rsvpRes.data || [];
+
+  // Batch-fetch avatar colors for everyone in the RSVP list, so the list
+  // can show each person's own chosen color instead of a flat default.
+  let avatarColors = {};
+  const userIds = [...new Set(rsvps.map(r => r.user_id).filter(Boolean))];
+  if (userIds.length) {
+    try {
+      const { data: profiles } = await sb.from('public_profiles').select('user_id, avatar_color').in('user_id', userIds);
+      (profiles || []).forEach(p => { avatarColors[p.user_id] = p.avatar_color || '#F59E0B'; });
+    } catch(e) { /* non-fatal — falls back to default color below */ }
+  }
+
+  currentEventData = { event: evRes.data, items: itemRes.data || [], rsvps, avatarColors };
 }
 
 // ─── RENDER HOST DASHBOARD ────────────────────────────────────────
@@ -1618,6 +1635,26 @@ async function renderAccountSettings() {
 
   const accountSectionHtml = currentUser ? `
     <div class="panel">
+      <h2>🌐 Public Profile</h2>
+      <p style="color:var(--muted);font-size:0.85rem;margin-bottom:14px;">This is what others see when they click your name on an RSVP list.</p>
+      <div class="form-group">
+        <label>Bio</label>
+        <textarea id="account-bio-input" placeholder="Say a little about yourself…" maxlength="280">${esc(currentUser.user_metadata?.bio || '')}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Avatar Color</label>
+        <div class="color-pick" id="account-avatar-color-pick">
+          ${['#F59E0B','#F43F5E','#6366F1','#06B6D4','#10B981','#8B5CF6'].map(c =>
+            `<div class="color-swatch${(currentUser.user_metadata?.avatar_color || '#F59E0B') === c ? ' selected' : ''}" data-color="${c}" style="background:${c}"></div>`
+          ).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:6px;">
+        <button class="btn btn-primary btn-sm" id="account-save-public-btn" onclick="saveAccountPublicProfile()">Save Profile</button>
+        <button class="btn btn-ghost btn-sm" onclick="showProfile('${currentUser.id}', 'account-settings')">View My Public Profile →</button>
+      </div>
+    </div>
+    <div class="panel">
       <h2>👤 Account</h2>
       <div class="profile-field-row">
         <span class="profile-field-label">Name</span>
@@ -1637,26 +1674,6 @@ async function renderAccountSettings() {
       <div class="profile-field-row">
         <span class="profile-field-label">Session</span>
         <button class="btn-logout" onclick="userSignOut()">Sign out</button>
-      </div>
-    </div>
-    <div class="panel">
-      <h2>🌐 Public Profile</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin-bottom:14px;">This is what others see when they click your name on an RSVP list.</p>
-      <div class="form-group">
-        <label>Bio</label>
-        <textarea id="account-bio-input" placeholder="Say a little about yourself…" maxlength="280">${esc(currentUser.user_metadata?.bio || '')}</textarea>
-      </div>
-      <div class="form-group">
-        <label>Avatar Color</label>
-        <div class="color-pick" id="account-avatar-color-pick">
-          ${['#F59E0B','#F43F5E','#6366F1','#06B6D4','#10B981','#8B5CF6'].map(c =>
-            `<div class="color-swatch${(currentUser.user_metadata?.avatar_color || '#F59E0B') === c ? ' selected' : ''}" data-color="${c}" style="background:${c}"></div>`
-          ).join('')}
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:6px;">
-        <button class="btn btn-primary btn-sm" id="account-save-public-btn" onclick="saveAccountPublicProfile()">Save Profile</button>
-        <button class="btn btn-ghost btn-sm" onclick="showProfile('${currentUser.id}', 'account-settings')">View My Public Profile →</button>
       </div>
     </div>
   ` : `
@@ -1714,6 +1731,7 @@ async function saveAccountPublicProfile() {
     if (error) throw error;
     currentUser = data.user;
     await syncPublicProfile();
+    renderUserNav();
     showToast('Public profile updated ✓');
   } catch(e) {
     showToast('Error updating profile: ' + e.message, true);
@@ -1879,16 +1897,20 @@ function renderDetail() {
   const rsvpList = document.getElementById('rsvp-list');
   const isAdmin = isAdminLoggedIn();
   const sortedRsvps = [...rsvps].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  const avatarColors = currentEventData.avatarColors || {};
   rsvpList.innerHTML = sortedRsvps.length
-    ? sortedRsvps.map(r => `<div class="rsvp-item">
-        <div class="avatar">${r.name[0].toUpperCase()}</div>
+    ? sortedRsvps.map(r => {
+        const avColor = (r.user_id && avatarColors[r.user_id]) || '#F59E0B';
+        return `<div class="rsvp-item">
+        <div class="avatar" style="background:${esc(avColor)};">${r.name[0].toUpperCase()}</div>
         ${r.user_id
           ? `<span class="name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--muted);" onclick="showProfile('${r.user_id}','detail')">${esc(r.name)}</span>`
           : `<span class="name">${esc(r.name)}</span>`}
         ${r.note?`<span style="color:var(--muted);font-size:0.78rem;font-style:italic">"${esc(r.note)}"</span>`:''}
         <span class="badge badge-${r.status}">${r.status==='yes'?'Going':r.status==='maybe'?'Maybe':'Nope'}</span>
         ${isAdmin?`<button class="row-delete-btn" title="Remove this RSVP" onclick="requireAdmin(()=>deleteRsvp('${r.id}'))">🗑</button>`:''}
-      </div>`).join('')
+      </div>`;
+      }).join('')
     : '<p style="color:var(--muted);font-size:0.85rem;">No RSVPs yet — be the first!</p>';
 
   // Items
