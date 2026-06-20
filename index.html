@@ -362,7 +362,7 @@ create policy "signed in users insert rsvps" on rsvps
     auth.uid() is not null and auth.uid() = user_id
     and not exists (
       select 1 from events where events.id = rsvps.event_id
-      and events.datetime is not null and events.datetime < now()
+      and events.datetime is not null and events.datetime::timestamp < (now() at time zone 'UTC')
     )
   );
 
@@ -372,7 +372,7 @@ create policy "users update own rsvps" on rsvps
     auth.uid() = user_id
     and not exists (
       select 1 from events where events.id = rsvps.event_id
-      and events.datetime is not null and events.datetime < now()
+      and events.datetime is not null and events.datetime::timestamp < (now() at time zone 'UTC')
     )
   );
 
@@ -382,7 +382,7 @@ create policy "signed in users insert items" on items
     auth.uid() is not null and (claimed_by_user_id is null or claimed_by_user_id = auth.uid())
     and not exists (
       select 1 from events where events.id = items.event_id
-      and events.datetime is not null and events.datetime < now()
+      and events.datetime is not null and events.datetime::timestamp < (now() at time zone 'UTC')
     )
   );
 
@@ -418,7 +418,7 @@ create policy "signed in users insert rsvps" on rsvps
     auth.uid() is not null and auth.uid() = user_id
     and not exists (
       select 1 from events where events.id = rsvps.event_id
-      and events.datetime is not null and events.datetime < now()
+      and events.datetime is not null and events.datetime::timestamp < (now() at time zone 'UTC')
     )
     and (
       status != 'yes' or not exists (
@@ -436,7 +436,7 @@ create policy "users update own rsvps" on rsvps
     auth.uid() = user_id
     and not exists (
       select 1 from events where events.id = rsvps.event_id
-      and events.datetime is not null and events.datetime < now()
+      and events.datetime is not null and events.datetime::timestamp < (now() at time zone 'UTC')
     )
   )
   with check (
@@ -449,7 +449,7 @@ create policy "users update own rsvps" on rsvps
   );</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
-    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ The last block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, and enforces an optional RSVP cap — all at the database level. If you previously ran an earlier version of this RSVP-limit policy, re-running this updated block will replace it.</p>
+    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ This block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, and enforces an optional RSVP cap — all at the database level. The "past event" check compares datetimes as naive local clock values (matching how the app displays them), not raw UTC, to avoid timezone-related false positives. If you ran an earlier version of this SQL, re-running this block will replace it with the corrected logic.</p>
 
     <div class="setup-steps" style="margin-top:16px;">
       <div class="setup-step"><p>Go to <strong>Project Settings → API</strong>. Copy your <code>Project URL</code> and <code>anon public</code> key below.</p></div>
@@ -1924,22 +1924,6 @@ async function submitRsvp() {
         .eq('id', existing.id);
       if (error) throw error;
     } else {
-      // Diagnostic: confirm what Supabase thinks the live session/user is,
-      // versus what we're about to send as user_id on the insert, and
-      // independently check the two conditions the RLS policy gates on.
-      const { data: sessionCheck } = await sb.auth.getSession();
-      const { data: eventCheck } = await sb.from('events').select('id, datetime, rsvp_limit').eq('id', currentEventId).single();
-      console.log('RSVP insert diagnostic:', {
-        sendingUserId: currentUser ? currentUser.id : null,
-        sessionUserId: sessionCheck?.session?.user?.id || null,
-        sessionExists: !!sessionCheck?.session,
-        eventId: currentEventId,
-        eventDatetime: eventCheck?.datetime,
-        eventDatetimeVsNow: eventCheck?.datetime ? `${eventCheck.datetime} vs ${new Date().toISOString()}` : 'no datetime set',
-        eventRsvpLimit: eventCheck?.rsvp_limit,
-        statusBeingSubmitted: selectedRsvpStatus
-      });
-
       const { error } = await sb.from('rsvps').insert({
         event_id: currentEventId,
         name,
