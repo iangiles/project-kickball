@@ -154,6 +154,14 @@
   @media(max-width: 640px) { .detail-grid { grid-template-columns: 1fr; } }
   .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
   .panel h2 { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .profile-sections { display: flex; flex-direction: column; gap: 20px; max-width: 560px; }
+  .profile-field-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .profile-field-row:last-child { border-bottom: none; }
+  .profile-field-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .profile-field-value { font-size: 0.92rem; color: var(--cream); }
+  .profile-inline-edit { display: flex; gap: 8px; align-items: center; }
+  .profile-inline-edit input { flex: 1; }
+  .admin-status-badge-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
   /* RSVP & ITEMS */
   .rsvp-list { display: flex; flex-direction: column; gap: 10px; }
@@ -256,11 +264,11 @@
     <button class="nav-tab active" id="nav-tab-host" onclick="switchView('host')" style="display:none;">Event Manager</button>
     <button class="nav-tab" id="nav-tab-public" onclick="switchView('public')">Browse</button>
     <button class="nav-tab" id="nav-tab-mine" onclick="switchView('mine')">My Events</button>
+    <button class="nav-tab" id="nav-tab-profile" onclick="switchView('profile')">Profile</button>
   </div>
   <button class="nav-menu-toggle" id="nav-menu-toggle" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
   <div class="nav-right" id="nav-right">
     <div class="nav-user-area" id="nav-user-area"></div>
-    <div class="nav-admin-area" id="nav-admin-area"></div>
   </div>
 </nav>
 
@@ -523,6 +531,14 @@ where datetime is not null;</div>
     </div>
     <div id="mine-content"></div>
     <div id="mine-past-section"></div>
+  </div>
+
+  <!-- PROFILE VIEW -->
+  <div id="view-profile" class="view">
+    <div class="dashboard-header">
+      <div><h1>Profile</h1><p>Manage your account and admin access.</p></div>
+    </div>
+    <div id="profile-content"></div>
   </div>
 
   <!-- DETAIL VIEW -->
@@ -895,7 +911,7 @@ function showSetupScreen() {
   document.getElementById('setup-screen').classList.add('active');
   document.getElementById('main-app').style.display = 'none';
   document.getElementById('nav-tabs').style.display = 'none';
-  document.getElementById('nav-admin-area').innerHTML = '';
+  document.getElementById('nav-user-area').innerHTML = '';
 }
 
 function showApp() {
@@ -1014,6 +1030,7 @@ async function initUserSession() {
       currentUser = session?.user || null;
       renderUserNav();
       if (currentView === 'mine') renderMyEvents();
+      if (currentView === 'profile') renderProfile();
     });
   } catch(e) { /* ignore if listener registration fails in sandboxed env */ }
 }
@@ -1032,11 +1049,11 @@ function renderUserNav() {
   const el = document.getElementById('nav-user-area');
   if (currentUser) {
     el.innerHTML = `
-      <span class="user-chip"><span class="avatar-sm">${userInitial()}</span>${esc(userDisplayName())}</span>
-      <button class="change-pw-link" onclick="openChangeAccountPasswordModal()">Change password</button>
-      <button class="btn-logout" onclick="userSignOut()">Sign out</button>`;
+      <button class="user-chip" style="cursor:pointer;border:1px solid var(--border);" onclick="switchView('profile')">
+        <span class="avatar-sm">${userInitial()}</span>${esc(userDisplayName())}
+      </button>`;
   } else {
-    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="openAuthModal('login')">Sign In</button>`;
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="switchView('profile')">Sign In</button>`;
   }
 }
 
@@ -1106,6 +1123,7 @@ async function submitAuth() {
       showToast(`Welcome back, ${userDisplayName()}! 👋`);
     }
     if (currentView === 'mine') renderMyEvents();
+    if (currentView === 'profile') renderProfile();
     if (currentUser && pendingUserAction) {
       const action = pendingUserAction;
       pendingUserAction = null;
@@ -1124,6 +1142,7 @@ async function userSignOut() {
   currentUser = null;
   renderUserNav();
   if (currentView === 'mine') renderMyEvents();
+  if (currentView === 'profile') renderProfile();
   showToast('Signed out.');
   closeNavMenu();
 }
@@ -1240,6 +1259,7 @@ async function submitAdminLogin() {
     closeModal('modal-admin-login');
     renderAdminNav();
     renderHostDashboard();
+    if (currentView === 'profile') renderProfile();
     showToast('Signed in as admin ✓');
     if (pendingAdminAction) { pendingAdminAction(); pendingAdminAction = null; }
   } else {
@@ -1253,6 +1273,7 @@ function adminLogout() {
   sessionStorage.removeItem(ADMIN_SESSION_KEY);
   renderAdminNav();
   renderHostDashboard();
+  if (currentView === 'profile') renderProfile();
   showToast('Signed out.');
   closeNavMenu();
 }
@@ -1294,21 +1315,14 @@ async function submitSetPassword() {
   closeModal('modal-set-password');
   renderAdminNav();
   renderHostDashboard();
+  if (currentView === 'profile') renderProfile();
   showToast(_setPwIsChange ? 'Password updated for all devices ✓' : 'Admin password set — you\'re signed in ✓');
   if (_setPwCallback) { _setPwCallback(); _setPwCallback = null; }
 }
 
 function renderAdminNav() {
-  const el = document.getElementById('nav-admin-area');
-  if (isAdminLoggedIn()) {
-    el.innerHTML = `
-      <span class="admin-badge">🔑 Admin</span>
-      <button class="change-pw-link" onclick="openSetPasswordModal(false)">Change password</button>
-      <button class="btn-logout" onclick="adminLogout()">Sign out</button>
-      <button class="btn btn-primary" onclick="requireAdmin(openCreateModal)">+ New Event</button>`;
-  } else {
-    el.innerHTML = `<button class="btn btn-ghost" onclick="requireAdmin(()=>{})">🔒 Admin Sign In</button>`;
-  }
+  // Admin sign-in/out/change-password now live on the Profile page.
+  // This function just keeps the Event Manager tab's visibility in sync.
   updateNavTabVisibility();
 }
 
@@ -1351,11 +1365,12 @@ function switchView(v) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + v).classList.add('active');
   document.querySelectorAll('.nav-tabs .nav-tab').forEach(t => t.classList.remove('active'));
-  const tabMap = { host: 'nav-tab-host', public: 'nav-tab-public', mine: 'nav-tab-mine' };
+  const tabMap = { host: 'nav-tab-host', public: 'nav-tab-public', mine: 'nav-tab-mine', profile: 'nav-tab-profile' };
   if (tabMap[v]) document.getElementById(tabMap[v]).classList.add('active');
   if (v === 'host') renderHostDashboard();
   if (v === 'public') renderPublicEvents();
   if (v === 'mine') renderMyEvents();
+  if (v === 'profile') renderProfile();
   closeNavMenu();
 }
 
@@ -1511,6 +1526,101 @@ async function renderMyEvents() {
     container.innerHTML = '';
     pastContainer.innerHTML = '';
     showToast('Error loading your events: ' + e.message, true);
+  }
+}
+
+// ─── PROFILE ──────────────────────────────────────────────────────
+async function renderProfile() {
+  const container = document.getElementById('profile-content');
+
+  const accountSectionHtml = currentUser ? `
+    <div class="panel">
+      <h2>👤 Account</h2>
+      <div class="profile-field-row">
+        <span class="profile-field-label">Name</span>
+        <div id="profile-name-display" class="profile-inline-edit" style="justify-content:flex-end;">
+          <span class="profile-field-value">${esc(userDisplayName())}</span>
+          <button class="change-pw-link" onclick="startEditProfileName()">Edit</button>
+        </div>
+      </div>
+      <div class="profile-field-row">
+        <span class="profile-field-label">Email</span>
+        <span class="profile-field-value">${esc(currentUser.email)}</span>
+      </div>
+      <div class="profile-field-row">
+        <span class="profile-field-label">Password</span>
+        <button class="btn btn-ghost btn-sm" onclick="openChangeAccountPasswordModal()">Change Password</button>
+      </div>
+      <div class="profile-field-row">
+        <span class="profile-field-label">Session</span>
+        <button class="btn-logout" onclick="userSignOut()">Sign out</button>
+      </div>
+    </div>
+  ` : `
+    <div class="panel">
+      <h2>👤 Account</h2>
+      <p style="color:var(--muted);font-size:0.88rem;margin-bottom:14px;">Sign in to track events you've RSVP'd to, claim items, and manage your profile.</p>
+      <button class="btn btn-primary" onclick="openAuthModal('login')">Sign In</button>
+      <button class="btn btn-ghost" onclick="openAuthModal('signup')" style="margin-left:8px;">Create Account</button>
+    </div>
+  `;
+
+  const isAdmin = isAdminLoggedIn();
+  const adminSectionHtml = `
+    <div class="panel">
+      <h2>🔑 Admin Access</h2>
+      ${isAdmin ? `
+        <div class="profile-field-row">
+          <span class="profile-field-label">Status</span>
+          <span class="admin-badge">🔑 Admin</span>
+        </div>
+        <div class="profile-field-row">
+          <span class="profile-field-label">Admin Password</span>
+          <button class="btn btn-ghost btn-sm" onclick="openSetPasswordModal(false)">Change Password</button>
+        </div>
+        <div class="profile-field-row">
+          <span class="profile-field-label">Session</span>
+          <button class="btn-logout" onclick="adminLogout()">Sign out of Admin</button>
+        </div>
+      ` : `
+        <p style="color:var(--muted);font-size:0.88rem;margin-bottom:14px;">Sign in with the admin password to create and manage events.</p>
+        <button class="btn btn-primary" onclick="requireAdmin(()=>{ if (currentView==='profile') renderProfile(); })">🔒 Admin Sign In</button>
+      `}
+    </div>
+  `;
+
+  container.innerHTML = `<div class="profile-sections">${accountSectionHtml}${adminSectionHtml}</div>`;
+}
+
+function startEditProfileName() {
+  const wrap = document.getElementById('profile-name-display');
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <input type="text" id="profile-name-input" value="${esc(userDisplayName())}" style="max-width:200px;">
+    <button class="btn btn-primary btn-sm" id="profile-name-save-btn" onclick="saveProfileName()">Save</button>
+    <button class="btn btn-ghost btn-sm" onclick="renderProfile()">Cancel</button>`;
+  document.getElementById('profile-name-input').focus();
+  document.getElementById('profile-name-input').addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') saveProfileName();
+  });
+}
+
+async function saveProfileName() {
+  const input = document.getElementById('profile-name-input');
+  const newName = input.value.trim();
+  if (!newName) { showToast('Name cannot be empty.', true); return; }
+  setBtnLoading('profile-name-save-btn', true);
+  try {
+    const { data, error } = await sb.auth.updateUser({ data: { name: newName } });
+    if (error) throw error;
+    currentUser = data.user;
+    renderUserNav();
+    renderProfile();
+    showToast('Name updated ✓');
+  } catch(e) {
+    showToast('Error updating name: ' + e.message, true);
+  } finally {
+    setBtnLoading('profile-name-save-btn', false);
   }
 }
 
