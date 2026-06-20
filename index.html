@@ -164,6 +164,12 @@
   .badge-yes { background: rgba(107,143,113,0.2); color: #86EFAC; }
   .badge-maybe { background: rgba(245,158,11,0.2); color: #FCD34D; }
   .badge-no { background: rgba(244,63,94,0.2); color: #FCA5A5; }
+  .row-delete-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 0.95rem; padding: 2px 4px; line-height: 1; flex-shrink: 0;
+    border-radius: 6px; transition: all 0.15s;
+  }
+  .row-delete-btn:hover { color: var(--rose); background: rgba(244,63,94,0.12); }
   .items-list { display: flex; flex-direction: column; gap: 8px; }
   .item-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border-radius: 8px; font-size: 0.88rem; }
   .item-row .item-name { flex: 1; font-weight: 500; }
@@ -378,10 +384,15 @@ create policy "signed in users insert items" on items
       select 1 from events where events.id = items.event_id
       and events.datetime is not null and events.datetime < now()
     )
-  );</div>
+  );
+
+-- Allow RSVPs to be deleted (used by event admins to remove a guest's RSVP).
+-- Admin access is gated by the app's own password system, not Supabase Auth,
+-- so this stays open the same way events/items deletes already are.
+create policy "public delete rsvps" on rsvps for delete using (true);</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
-    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ The last block blocks RSVPs and item sign-ups for events whose date has already passed, at the database level — not just in the app's UI.</p>
+    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ The last block blocks RSVPs and item sign-ups for events whose date has already passed, at the database level — not just in the app's UI. It also allows RSVPs to be deleted, used by admins to remove a guest.</p>
 
     <div class="setup-steps" style="margin-top:16px;">
       <div class="setup-step"><p>Go to <strong>Project Settings → API</strong>. Copy your <code>Project URL</code> and <code>anon public</code> key below.</p></div>
@@ -1474,12 +1485,14 @@ function renderDetail() {
   // RSVPs
   document.getElementById('rsvp-count-badge').textContent = `(${rsvps.length})`;
   const rsvpList = document.getElementById('rsvp-list');
+  const isAdmin = isAdminLoggedIn();
   rsvpList.innerHTML = rsvps.length
     ? rsvps.map(r => `<div class="rsvp-item">
         <div class="avatar">${r.name[0].toUpperCase()}</div>
         <span class="name">${esc(r.name)}</span>
         ${r.note?`<span style="color:var(--muted);font-size:0.78rem;font-style:italic">"${esc(r.note)}"</span>`:''}
         <span class="badge badge-${r.status}">${r.status==='yes'?'Going':r.status==='maybe'?'Maybe':'Nope'}</span>
+        ${isAdmin?`<button class="row-delete-btn" title="Remove this RSVP" onclick="requireAdmin(()=>deleteRsvp('${r.id}'))">🗑</button>`:''}
       </div>`).join('')
     : '<p style="color:var(--muted);font-size:0.85rem;">No RSVPs yet — be the first!</p>';
 
@@ -1495,6 +1508,7 @@ function renderDetail() {
         <span class="item-name ${it.claimed_by?'item-claimed':''}">${esc(it.name)}</span>
         ${it.qty>1?`<span class="item-qty">×${it.qty}</span>`:''}
         ${it.claimed_by?`<span class="item-claimer">✓ ${esc(it.claimed_by)}</span>`:'<span style="color:var(--muted);font-size:0.75rem;">Open</span>'}
+        ${isAdmin && it.claimed_by?`<button class="row-delete-btn" title="Unclaim this item" onclick="requireAdmin(()=>unclaimItem('${it.id}'))">🗑</button>`:''}
       </div>`).join('')
     : '<p style="color:var(--muted);font-size:0.85rem;">No items needed — just bring yourself!</p>';
 
@@ -1885,6 +1899,34 @@ async function deleteEvent(id) {
   } catch(e) {
     hideLoading();
     showToast('Error deleting: ' + e.message, true);
+  }
+}
+
+async function deleteRsvp(rsvpId) {
+  if (!isAdminLoggedIn()) { requireAdmin(() => deleteRsvp(rsvpId)); return; }
+  if (!confirm('Remove this RSVP? This cannot be undone.')) return;
+  try {
+    const { error } = await sb.from('rsvps').delete().eq('id', rsvpId);
+    if (error) throw error;
+    await loadEventDetail(currentEventId);
+    renderDetail();
+    showToast('RSVP removed.');
+  } catch(e) {
+    showToast('Error removing RSVP: ' + e.message, true);
+  }
+}
+
+async function unclaimItem(itemId) {
+  if (!isAdminLoggedIn()) { requireAdmin(() => unclaimItem(itemId)); return; }
+  if (!confirm('Remove this claim? The item will become available again for someone else to bring.')) return;
+  try {
+    const { error } = await sb.from('items').update({ claimed_by: null, claimed_by_user_id: null }).eq('id', itemId);
+    if (error) throw error;
+    await loadEventDetail(currentEventId);
+    renderDetail();
+    showToast('Item claim removed.');
+  } catch(e) {
+    showToast('Error removing claim: ' + e.message, true);
   }
 }
 
