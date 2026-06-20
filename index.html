@@ -1924,6 +1924,22 @@ async function submitRsvp() {
         .eq('id', existing.id);
       if (error) throw error;
     } else {
+      // Diagnostic: confirm what Supabase thinks the live session/user is,
+      // versus what we're about to send as user_id on the insert, and
+      // independently check the two conditions the RLS policy gates on.
+      const { data: sessionCheck } = await sb.auth.getSession();
+      const { data: eventCheck } = await sb.from('events').select('id, datetime, rsvp_limit').eq('id', currentEventId).single();
+      console.log('RSVP insert diagnostic:', {
+        sendingUserId: currentUser ? currentUser.id : null,
+        sessionUserId: sessionCheck?.session?.user?.id || null,
+        sessionExists: !!sessionCheck?.session,
+        eventId: currentEventId,
+        eventDatetime: eventCheck?.datetime,
+        eventDatetimeVsNow: eventCheck?.datetime ? `${eventCheck.datetime} vs ${new Date().toISOString()}` : 'no datetime set',
+        eventRsvpLimit: eventCheck?.rsvp_limit,
+        statusBeingSubmitted: selectedRsvpStatus
+      });
+
       const { error } = await sb.from('rsvps').insert({
         event_id: currentEventId,
         name,
