@@ -395,6 +395,21 @@ create policy "public delete rsvps" on rsvps for delete using (true);
 alter table events add column if not exists maps_url text;
 alter table events add column if not exists rsvp_limit integer;
 
+-- Helper function to count confirmed ("yes") RSVPs for an event.
+-- SECURITY DEFINER lets it bypass RLS internally so it can be safely called
+-- from inside an RLS policy on the same table without recursion issues.
+create or replace function public.yes_rsvp_count(p_event_id uuid, p_exclude_rsvp_id uuid default null)
+returns integer
+language sql
+security definer
+set search_path = public
+as $$
+  select count(*)::integer from rsvps
+  where event_id = p_event_id
+    and status = 'yes'
+    and (p_exclude_rsvp_id is null or id != p_exclude_rsvp_id);
+$$;
+
 -- Enforce the RSVP limit at the database level too (only "yes" RSVPs count
 -- against the cap; events with no limit set are unrestricted).
 drop policy if exists "signed in users insert rsvps" on rsvps;
@@ -410,9 +425,7 @@ create policy "signed in users insert rsvps" on rsvps
         select 1 from events
         where events.id = rsvps.event_id
         and events.rsvp_limit is not null
-        and events.rsvp_limit <= (
-          select count(*) from rsvps r2 where r2.event_id = rsvps.event_id and r2.status = 'yes'
-        )
+        and events.rsvp_limit <= public.yes_rsvp_count(rsvps.event_id)
       )
     )
   );
@@ -431,15 +444,12 @@ create policy "users update own rsvps" on rsvps
       select 1 from events
       where events.id = rsvps.event_id
       and events.rsvp_limit is not null
-      and events.rsvp_limit <= (
-        select count(*) from rsvps r2
-        where r2.event_id = rsvps.event_id and r2.status = 'yes' and r2.id != rsvps.id
-      )
+      and events.rsvp_limit <= public.yes_rsvp_count(rsvps.event_id, rsvps.id)
     )
   );</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
-    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ The last block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, and enforces an optional RSVP cap — all at the database level.</p>
+    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ The last block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, and enforces an optional RSVP cap — all at the database level. If you previously ran an earlier version of this RSVP-limit policy, re-running this updated block will replace it.</p>
 
     <div class="setup-steps" style="margin-top:16px;">
       <div class="setup-step"><p>Go to <strong>Project Settings → API</strong>. Copy your <code>Project URL</code> and <code>anon public</code> key below.</p></div>
@@ -1930,9 +1940,18 @@ async function submitRsvp() {
     renderDetail();
     showToast(existing ? 'RSVP updated ✓' : 'RSVP submitted! Thanks 🙌');
   } catch(e) {
+    console.error('RSVP submit error:', e);
     const msg = (e.message || '').toLowerCase();
-    if (msg.includes('row-level security') || msg.includes('policy')) {
-      showToast('This event may have reached its RSVP limit or closed. Refreshing…', true);
+    if (msg.includes('row-level security')) {
+      // Distinguish "actually full" from other RLS rejections (past event, wrong user, etc.)
+      // by re-checking the limit ourselves rather than assuming why it failed.
+      const freshYesCount = currentEventData.rsvps.filter(r => r.status === 'yes').length;
+      const stillHasRoom = currentEventData.event.rsvp_limit == null || freshYesCount < currentEventData.event.rsvp_limit;
+      if (stillHasRoom) {
+        showToast('Error submitting RSVP (database rejected the request): ' + e.message, true);
+      } else {
+        showToast('This event has reached its RSVP limit.', true);
+      }
       await loadEventDetail(currentEventId);
       renderDetail();
     } else {
