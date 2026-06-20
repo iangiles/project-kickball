@@ -389,10 +389,57 @@ create policy "signed in users insert items" on items
 -- Allow RSVPs to be deleted (used by event admins to remove a guest's RSVP).
 -- Admin access is gated by the app's own password system, not Supabase Auth,
 -- so this stays open the same way events/items deletes already are.
-create policy "public delete rsvps" on rsvps for delete using (true);</div>
+create policy "public delete rsvps" on rsvps for delete using (true);
+
+-- Google Maps link for the event location, and an optional cap on "yes" RSVPs
+alter table events add column if not exists maps_url text;
+alter table events add column if not exists rsvp_limit integer;
+
+-- Enforce the RSVP limit at the database level too (only "yes" RSVPs count
+-- against the cap; events with no limit set are unrestricted).
+drop policy if exists "signed in users insert rsvps" on rsvps;
+create policy "signed in users insert rsvps" on rsvps
+  for insert with check (
+    auth.uid() is not null and auth.uid() = user_id
+    and not exists (
+      select 1 from events where events.id = rsvps.event_id
+      and events.datetime is not null and events.datetime < now()
+    )
+    and (
+      status != 'yes' or not exists (
+        select 1 from events
+        where events.id = rsvps.event_id
+        and events.rsvp_limit is not null
+        and events.rsvp_limit <= (
+          select count(*) from rsvps r2 where r2.event_id = rsvps.event_id and r2.status = 'yes'
+        )
+      )
+    )
+  );
+
+drop policy if exists "users update own rsvps" on rsvps;
+create policy "users update own rsvps" on rsvps
+  for update using (
+    auth.uid() = user_id
+    and not exists (
+      select 1 from events where events.id = rsvps.event_id
+      and events.datetime is not null and events.datetime < now()
+    )
+  )
+  with check (
+    status != 'yes' or not exists (
+      select 1 from events
+      where events.id = rsvps.event_id
+      and events.rsvp_limit is not null
+      and events.rsvp_limit <= (
+        select count(*) from rsvps r2
+        where r2.event_id = rsvps.event_id and r2.status = 'yes' and r2.id != rsvps.id
+      )
+    )
+  );</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
-    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ The last block blocks RSVPs and item sign-ups for events whose date has already passed, at the database level — not just in the app's UI. It also allows RSVPs to be deleted, used by admins to remove a guest.</p>
+    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ The last block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, and enforces an optional RSVP cap — all at the database level.</p>
 
     <div class="setup-steps" style="margin-top:16px;">
       <div class="setup-step"><p>Go to <strong>Project Settings → API</strong>. Copy your <code>Project URL</code> and <code>anon public</code> key below.</p></div>
@@ -493,7 +540,17 @@ create policy "public delete rsvps" on rsvps for delete using (true);</div>
     <div class="form-group"><label>Event Name</label><input type="text" id="new-title" placeholder="Summer Potluck at the Park"></div>
     <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="new-datetime"></div>
     <div class="form-group"><label>Location</label><input type="text" id="new-location" placeholder="Volunteer Park, Seattle"></div>
+    <div class="form-group">
+      <label>Google Maps Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="url" id="new-maps-url" placeholder="https://maps.google.com/?q=...">
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">If set, guests can tap the location name to open it in Google Maps.</p>
+    </div>
     <div class="form-group"><label>Description</label><textarea id="new-desc" placeholder="Tell guests what to expect…"></textarea></div>
+    <div class="form-group">
+      <label>RSVP Limit <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="number" id="new-rsvp-limit" min="1" placeholder="Leave blank for unlimited">
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Caps the number of guests who can RSVP "Yes."</p>
+    </div>
     <div class="form-group">
       <label>Color Theme</label>
       <div class="color-pick" id="color-pick">
@@ -525,7 +582,17 @@ create policy "public delete rsvps" on rsvps for delete using (true);</div>
     <div class="form-group"><label>Event Name</label><input type="text" id="edit-title" placeholder="Summer Potluck at the Park"></div>
     <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="edit-datetime"></div>
     <div class="form-group"><label>Location</label><input type="text" id="edit-location" placeholder="Volunteer Park, Seattle"></div>
+    <div class="form-group">
+      <label>Google Maps Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="url" id="edit-maps-url" placeholder="https://maps.google.com/?q=...">
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">If set, guests can tap the location name to open it in Google Maps.</p>
+    </div>
     <div class="form-group"><label>Description</label><textarea id="edit-desc" placeholder="Tell guests what to expect…"></textarea></div>
+    <div class="form-group">
+      <label>RSVP Limit <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="number" id="edit-rsvp-limit" min="1" placeholder="Leave blank for unlimited">
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Caps the number of guests who can RSVP "Yes."</p>
+    </div>
     <div class="form-group">
       <label>Color Theme</label>
       <div class="color-pick" id="edit-color-pick">
@@ -1464,11 +1531,19 @@ function renderDetail() {
   const date = fmtDate(e.datetime, {weekday:'long',month:'long',day:'numeric',year:'numeric'});
   const time = fmtTime(e.datetime);
   const yesCount = rsvps.filter(r => r.status === 'yes').length;
+  const hasLimit = e.rsvp_limit != null;
+  const limitReached = hasLimit && yesCount >= e.rsvp_limit;
+
+  const locationHtml = e.location
+    ? (e.maps_url
+        ? `<a href="${esc(e.maps_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--cream);text-decoration:underline;text-decoration-color:var(--muted);">${esc(e.location)}</a>`
+        : esc(e.location))
+    : '';
 
   document.getElementById('detail-meta').innerHTML = `
     <div class="detail-meta-item">📅 <strong>${date}${time?' at '+time:''}</strong></div>
-    ${e.location?`<div class="detail-meta-item">📍 <strong>${esc(e.location)}</strong></div>`:''}
-    <div class="detail-meta-item">🙋 <strong>${yesCount} attending</strong></div>`;
+    ${e.location?`<div class="detail-meta-item">📍 <strong>${locationHtml}</strong></div>`:''}
+    <div class="detail-meta-item">🙋 <strong>${yesCount}${hasLimit ? ' / ' + e.rsvp_limit : ''} attending</strong>${limitReached ? ' <span class="badge badge-no" style="margin-left:4px;">Full</span>' : ''}</div>`;
   document.getElementById('detail-desc').textContent = e.description || '';
 
   const shareUrl = `${location.origin}${location.pathname}?event=${e.id}`;
@@ -1519,8 +1594,16 @@ function renderDetail() {
     document.getElementById('claim-action').innerHTML =
       `<div class="past-event-notice">🕒 This event has already happened — sign-ups are closed.</div>`;
   } else {
-    document.getElementById('rsvp-action').innerHTML =
-      `<button class="btn btn-primary" style="width:100%;" onclick="requireUser(openRsvpModal, 'Sign in to RSVP to this event.')">RSVP to this event</button>`;
+    const myExistingRsvp = currentUser ? rsvps.find(r => r.user_id === currentUser.id) : null;
+    // Someone already RSVP'd "yes" can still open the form to change their answer
+    // even if the event is full — the limit only blocks *new* yes RSVPs.
+    if (limitReached && !(myExistingRsvp && myExistingRsvp.status === 'yes')) {
+      document.getElementById('rsvp-action').innerHTML =
+        `<div class="past-event-notice">🚫 This event has reached its RSVP limit (${e.rsvp_limit}).</div>`;
+    } else {
+      document.getElementById('rsvp-action').innerHTML =
+        `<button class="btn btn-primary" style="width:100%;" onclick="requireUser(openRsvpModal, 'Sign in to RSVP to this event.')">RSVP to this event</button>`;
+    }
     document.getElementById('claim-action').innerHTML =
       `<button class="btn btn-ghost" style="width:100%;" onclick="requireUser(openClaimModal, 'Sign in to claim an item to bring.')">Claim an item</button>`;
   }
@@ -1528,7 +1611,7 @@ function renderDetail() {
 
 // ─── CREATE EVENT ─────────────────────────────────────────────────
 function openCreateModal() {
-  ['new-title','new-datetime','new-location','new-desc'].forEach(id => document.getElementById(id).value = '');
+  ['new-title','new-datetime','new-location','new-maps-url','new-desc','new-rsvp-limit'].forEach(id => document.getElementById(id).value = '');
   selectedColor = '#F59E0B';
   document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s.dataset.color === selectedColor));
   document.getElementById('items-builder').innerHTML = '';
@@ -1557,6 +1640,13 @@ async function createNewEvent() {
   const title = document.getElementById('new-title').value.trim();
   if (!title) { showToast('Please enter an event name.', true); return; }
 
+  const mapsUrlRaw = document.getElementById('new-maps-url').value.trim();
+  if (mapsUrlRaw && !isValidUrl(mapsUrlRaw)) { showToast('Please enter a valid Google Maps URL (starting with http:// or https://).', true); return; }
+
+  const rsvpLimitRaw = document.getElementById('new-rsvp-limit').value.trim();
+  const rsvpLimit = rsvpLimitRaw ? parseInt(rsvpLimitRaw) : null;
+  if (rsvpLimitRaw && (!Number.isInteger(rsvpLimit) || rsvpLimit < 1)) { showToast('RSVP limit must be a whole number of 1 or more.', true); return; }
+
   const rows = document.querySelectorAll('#items-builder .item-builder-row');
 
   const itemRows = [...rows].map((r, i) => {
@@ -1573,8 +1663,10 @@ async function createNewEvent() {
       title,
       datetime: document.getElementById('new-datetime').value || null,
       location: document.getElementById('new-location').value.trim() || null,
+      maps_url: mapsUrlRaw || null,
       description: document.getElementById('new-desc').value.trim() || null,
-      color: selectedColor
+      color: selectedColor,
+      rsvp_limit: rsvpLimit
     }]).select().single();
     if (evErr) throw evErr;
     if (itemRows.length) {
@@ -1622,7 +1714,9 @@ async function openEditModal(eventId) {
     document.getElementById('edit-title').value = e.title || '';
     document.getElementById('edit-datetime').value = dtToInputVal(e.datetime);
     document.getElementById('edit-location').value = e.location || '';
+    document.getElementById('edit-maps-url').value = e.maps_url || '';
     document.getElementById('edit-desc').value = e.description || '';
+    document.getElementById('edit-rsvp-limit').value = e.rsvp_limit != null ? e.rsvp_limit : '';
     document.getElementById('edit-modal-sub').textContent = `Editing: ${e.title}`;
 
     // Color
@@ -1668,6 +1762,22 @@ async function saveEditedEvent() {
   const title = document.getElementById('edit-title').value.trim();
   if (!title) { showToast('Please enter an event name.', true); return; }
 
+  const mapsUrlRaw = document.getElementById('edit-maps-url').value.trim();
+  if (mapsUrlRaw && !isValidUrl(mapsUrlRaw)) { showToast('Please enter a valid Google Maps URL (starting with http:// or https://).', true); return; }
+
+  const rsvpLimitRaw = document.getElementById('edit-rsvp-limit').value.trim();
+  const rsvpLimit = rsvpLimitRaw ? parseInt(rsvpLimitRaw) : null;
+  if (rsvpLimitRaw && (!Number.isInteger(rsvpLimit) || rsvpLimit < 1)) { showToast('RSVP limit must be a whole number of 1 or more.', true); return; }
+
+  const currentYesCount = (currentEventData && currentEventData.event && currentEventData.event.id === editEventId)
+    ? currentEventData.rsvps.filter(r => r.status === 'yes').length
+    : null;
+  if (rsvpLimit !== null && currentYesCount !== null && rsvpLimit < currentYesCount) {
+    if (!confirm(`This event already has ${currentYesCount} confirmed "Yes" RSVPs, which is more than the new limit of ${rsvpLimit}. Existing RSVPs won't be removed, but no new "Yes" RSVPs will be allowed until the count drops below the limit. Continue?`)) {
+      return;
+    }
+  }
+
   setBtnLoading('edit-event-btn', true);
   try {
     // 1. Update core event fields
@@ -1675,8 +1785,10 @@ async function saveEditedEvent() {
       title,
       datetime: document.getElementById('edit-datetime').value || null,
       location: document.getElementById('edit-location').value.trim() || null,
+      maps_url: mapsUrlRaw || null,
       description: document.getElementById('edit-desc').value.trim() || null,
-      color: editSelectedColor
+      color: editSelectedColor,
+      rsvp_limit: rsvpLimit
     }).eq('id', editEventId);
     if (evErr) throw evErr;
 
@@ -1772,15 +1884,29 @@ async function submitRsvp() {
   const name = document.getElementById('rsvp-name').value.trim();
   if (!name) { showToast('Please enter your name.', true); return; }
   if (!selectedRsvpStatus) { showToast('Please choose your attendance.', true); return; }
+
+  const e = currentEventData.event;
+  const existing = currentUser
+    ? currentEventData.rsvps.find(r => r.user_id === currentUser.id)
+    : null;
+
+  // Pre-check the RSVP limit client-side for a clean error message;
+  // the database also enforces this independently as the source of truth.
+  if (e.rsvp_limit != null && selectedRsvpStatus === 'yes' && !(existing && existing.status === 'yes')) {
+    const yesCount = currentEventData.rsvps.filter(r => r.status === 'yes').length;
+    if (yesCount >= e.rsvp_limit) {
+      showToast(`Sorry, this event has reached its limit of ${e.rsvp_limit} RSVPs.`, true);
+      closeModal('modal-rsvp');
+      await loadEventDetail(currentEventId);
+      renderDetail();
+      return;
+    }
+  }
+
   setBtnLoading('rsvp-submit-btn', true);
   try {
     const email = document.getElementById('rsvp-email').value.trim() || null;
     const note = document.getElementById('rsvp-note').value.trim() || null;
-
-    // Logged-in users: update their existing RSVP for this event instead of creating a duplicate
-    const existing = currentUser
-      ? currentEventData.rsvps.find(r => r.user_id === currentUser.id)
-      : null;
 
     if (existing) {
       const { error } = await sb.from('rsvps')
@@ -1804,7 +1930,14 @@ async function submitRsvp() {
     renderDetail();
     showToast(existing ? 'RSVP updated ✓' : 'RSVP submitted! Thanks 🙌');
   } catch(e) {
-    showToast('Error submitting RSVP: ' + e.message, true);
+    const msg = (e.message || '').toLowerCase();
+    if (msg.includes('row-level security') || msg.includes('policy')) {
+      showToast('This event may have reached its RSVP limit or closed. Refreshing…', true);
+      await loadEventDetail(currentEventId);
+      renderDetail();
+    } else {
+      showToast('Error submitting RSVP: ' + e.message, true);
+    }
   } finally {
     setBtnLoading('rsvp-submit-btn', false);
   }
@@ -1932,6 +2065,10 @@ async function unclaimItem(itemId) {
 
 // ─── UTILS ────────────────────────────────────────────────────────
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function isValidUrl(str) {
+  try { const u = new URL(str); return u.protocol === 'http:' || u.protocol === 'https:'; }
+  catch(e) { return false; }
+}
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function copyLink(url) { navigator.clipboard.writeText(url).then(() => showToast('Link copied! 📋')); }
