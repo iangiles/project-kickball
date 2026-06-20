@@ -264,7 +264,6 @@
     <button class="nav-tab active" id="nav-tab-host" onclick="switchView('host')" style="display:none;">Event Manager</button>
     <button class="nav-tab" id="nav-tab-public" onclick="switchView('public')">Browse</button>
     <button class="nav-tab" id="nav-tab-mine" onclick="switchView('mine')">My Events</button>
-    <button class="nav-tab" id="nav-tab-profile" onclick="switchView('profile')">Profile</button>
   </div>
   <button class="nav-menu-toggle" id="nav-menu-toggle" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
   <div class="nav-right" id="nav-right">
@@ -458,6 +457,51 @@ create policy "users update own rsvps" on rsvps
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
     <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ This block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, and enforces an optional RSVP cap — all at the database level, using a true UTC comparison.</p>
+
+    <div class="setup-sql" id="public-profiles-sql" style="margin-top:16px;">-- Public profiles: a publicly-readable table mirroring each user's display
+-- name, bio, and avatar color, since auth.users itself isn't queryable by
+-- other users from the client. Kept in sync via sync_public_profile(), which
+-- the app calls any time the signed-in user updates their name/bio/color.
+create table if not exists public_profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  name text,
+  bio text,
+  avatar_color text default '#F59E0B',
+  updated_at timestamptz default now()
+);
+alter table public_profiles enable row level security;
+create policy "public read profiles" on public_profiles for select using (true);
+
+create or replace function public.sync_public_profile()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  u record;
+begin
+  select id, raw_user_meta_data into u from auth.users where id = auth.uid();
+  if u.id is null then
+    raise exception 'Not authenticated';
+  end if;
+  insert into public_profiles (user_id, name, bio, avatar_color, updated_at)
+  values (
+    u.id,
+    coalesce(u.raw_user_meta_data->>'name', split_part((select email from auth.users where id = u.id), '@', 1)),
+    u.raw_user_meta_data->>'bio',
+    coalesce(u.raw_user_meta_data->>'avatar_color', '#F59E0B'),
+    now()
+  )
+  on conflict (user_id) do update
+    set name = excluded.name, bio = excluded.bio, avatar_color = excluded.avatar_color, updated_at = now();
+end;
+$$;
+
+grant execute on function public.sync_public_profile() to authenticated;</div>
+    <button class="copy-sql-btn" onclick="copySql('public-profiles-sql')">Copy</button>
+    <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Powers public profile pages, viewable by clicking a name on the RSVP list.</p>
+
     <p style="color:var(--rose);font-size:0.78rem;margin-top:6px;">⚠️ IMPORTANT — one-time fix for existing events: earlier versions of this app stored datetimes as if they were UTC without actually converting them, so any events created before this update are now mislabeled. Run this once to correct existing rows (adjust the offset to match your timezone, e.g. replace '7 hours' with your UTC offset):</p>
     <div class="setup-sql" id="migration-sql" style="margin-top:8px;">-- Run ONCE to fix events created before this timestamp-handling update.
 -- Replace '7 hours' with your local UTC offset (e.g. Pacific = 7 or 8 hours
@@ -533,11 +577,17 @@ where datetime is not null;</div>
     <div id="mine-past-section"></div>
   </div>
 
-  <!-- PROFILE VIEW -->
-  <div id="view-profile" class="view">
+  <!-- ACCOUNT SETTINGS VIEW (private — your own account & admin access) -->
+  <div id="view-account-settings" class="view">
     <div class="dashboard-header">
-      <div><h1>Profile</h1><p>Manage your account and admin access.</p></div>
+      <div><h1>Account Settings</h1><p>Manage your account and admin access.</p></div>
     </div>
+    <div id="account-settings-content"></div>
+  </div>
+
+  <!-- PUBLIC PROFILE VIEW (anyone's profile — viewed by clicking a name) -->
+  <div id="view-profile" class="view">
+    <button class="detail-back" onclick="backToList()">← Back</button>
     <div id="profile-content"></div>
   </div>
 
@@ -922,8 +972,10 @@ function showApp() {
   initUserSession();
   renderAdminNav();
   const urlParams = new URLSearchParams(location.search);
-  const linked = urlParams.get('event');
-  if (linked) { showDetail(linked, 'public'); }
+  const linkedEvent = urlParams.get('event');
+  const linkedProfile = urlParams.get('profile');
+  if (linkedEvent) { showDetail(linkedEvent, 'public'); }
+  else if (linkedProfile) { showProfile(linkedProfile, 'public'); }
   else { switchView(isAdminLoggedIn() ? 'host' : 'public'); }
 }
 
@@ -1030,7 +1082,7 @@ async function initUserSession() {
       currentUser = session?.user || null;
       renderUserNav();
       if (currentView === 'mine') renderMyEvents();
-      if (currentView === 'profile') renderProfile();
+      if (currentView === 'account-settings') renderAccountSettings();
     });
   } catch(e) { /* ignore if listener registration fails in sandboxed env */ }
 }
@@ -1049,11 +1101,11 @@ function renderUserNav() {
   const el = document.getElementById('nav-user-area');
   if (currentUser) {
     el.innerHTML = `
-      <button class="user-chip" style="cursor:pointer;border:1px solid var(--border);" onclick="switchView('profile')">
+      <button class="user-chip" style="cursor:pointer;border:1px solid var(--border);" onclick="switchView('account-settings')">
         <span class="avatar-sm">${userInitial()}</span>${esc(userDisplayName())}
       </button>`;
   } else {
-    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="switchView('profile')">Sign In</button>`;
+    el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="switchView('account-settings')">Sign In</button>`;
   }
 }
 
@@ -1109,6 +1161,7 @@ async function submitAuth() {
       closeModal('modal-auth');
       renderUserNav();
       if (data.session) {
+        await syncPublicProfile();
         showToast(`Welcome, ${name}! 🎉`);
       } else {
         showToast('Account created! Check your email to confirm, then sign in.');
@@ -1120,10 +1173,11 @@ async function submitAuth() {
       currentUser = data.user;
       closeModal('modal-auth');
       renderUserNav();
+      await syncPublicProfile();
       showToast(`Welcome back, ${userDisplayName()}! 👋`);
     }
     if (currentView === 'mine') renderMyEvents();
-    if (currentView === 'profile') renderProfile();
+    if (currentView === 'account-settings') renderAccountSettings();
     if (currentUser && pendingUserAction) {
       const action = pendingUserAction;
       pendingUserAction = null;
@@ -1142,7 +1196,7 @@ async function userSignOut() {
   currentUser = null;
   renderUserNav();
   if (currentView === 'mine') renderMyEvents();
-  if (currentView === 'profile') renderProfile();
+  if (currentView === 'account-settings') renderAccountSettings();
   showToast('Signed out.');
   closeNavMenu();
 }
@@ -1259,7 +1313,7 @@ async function submitAdminLogin() {
     closeModal('modal-admin-login');
     renderAdminNav();
     renderHostDashboard();
-    if (currentView === 'profile') renderProfile();
+    if (currentView === 'account-settings') renderAccountSettings();
     showToast('Signed in as admin ✓');
     if (pendingAdminAction) { pendingAdminAction(); pendingAdminAction = null; }
   } else {
@@ -1273,7 +1327,7 @@ function adminLogout() {
   sessionStorage.removeItem(ADMIN_SESSION_KEY);
   renderAdminNav();
   renderHostDashboard();
-  if (currentView === 'profile') renderProfile();
+  if (currentView === 'account-settings') renderAccountSettings();
   showToast('Signed out.');
   closeNavMenu();
 }
@@ -1315,7 +1369,7 @@ async function submitSetPassword() {
   closeModal('modal-set-password');
   renderAdminNav();
   renderHostDashboard();
-  if (currentView === 'profile') renderProfile();
+  if (currentView === 'account-settings') renderAccountSettings();
   showToast(_setPwIsChange ? 'Password updated for all devices ✓' : 'Admin password set — you\'re signed in ✓');
   if (_setPwCallback) { _setPwCallback(); _setPwCallback = null; }
 }
@@ -1365,13 +1419,35 @@ function switchView(v) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + v).classList.add('active');
   document.querySelectorAll('.nav-tabs .nav-tab').forEach(t => t.classList.remove('active'));
-  const tabMap = { host: 'nav-tab-host', public: 'nav-tab-public', mine: 'nav-tab-mine', profile: 'nav-tab-profile' };
+  const tabMap = { host: 'nav-tab-host', public: 'nav-tab-public', mine: 'nav-tab-mine' };
   if (tabMap[v]) document.getElementById(tabMap[v]).classList.add('active');
   if (v === 'host') renderHostDashboard();
   if (v === 'public') renderPublicEvents();
   if (v === 'mine') renderMyEvents();
-  if (v === 'profile') renderProfile();
+  if (v === 'account-settings') renderAccountSettings();
   closeNavMenu();
+}
+
+let profileReturnToDetail = false;
+async function showProfile(userId, from) {
+  if (!userId) return;
+  // Special-case: if we got here from an event's RSVP list, remember to
+  // return to that specific event (currentEventId), not a generic tab —
+  // switchView('detail') wouldn't know which event to render. We preserve
+  // the *existing* fromView (e.g. 'public' or 'mine' — wherever the event
+  // detail page itself would return to) rather than overwriting it, so the
+  // chain profile → event → list still works correctly.
+  profileReturnToDetail = (from === 'detail');
+  if (!profileReturnToDetail) {
+    fromView = from || currentView;
+  }
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-profile').classList.add('active');
+  document.querySelectorAll('.nav-tabs .nav-tab').forEach(t => t.classList.remove('active'));
+  currentView = 'profile';
+  showLoading('Loading profile…');
+  await renderPublicProfile(userId);
+  hideLoading();
 }
 
 async function showDetail(id, from) {
@@ -1386,7 +1462,14 @@ async function showDetail(id, from) {
   renderDetail();
 }
 
-function backToList() { switchView(fromView); }
+function backToList() {
+  if (profileReturnToDetail && currentEventId) {
+    profileReturnToDetail = false;
+    showDetail(currentEventId, fromView);
+  } else {
+    switchView(fromView);
+  }
+}
 
 // ─── DB CALLS ─────────────────────────────────────────────────────
 async function fetchAllEvents() {
@@ -1530,8 +1613,8 @@ async function renderMyEvents() {
 }
 
 // ─── PROFILE ──────────────────────────────────────────────────────
-async function renderProfile() {
-  const container = document.getElementById('profile-content');
+async function renderAccountSettings() {
+  const container = document.getElementById('account-settings-content');
 
   const accountSectionHtml = currentUser ? `
     <div class="panel">
@@ -1554,6 +1637,26 @@ async function renderProfile() {
       <div class="profile-field-row">
         <span class="profile-field-label">Session</span>
         <button class="btn-logout" onclick="userSignOut()">Sign out</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>🌐 Public Profile</h2>
+      <p style="color:var(--muted);font-size:0.85rem;margin-bottom:14px;">This is what others see when they click your name on an RSVP list.</p>
+      <div class="form-group">
+        <label>Bio</label>
+        <textarea id="account-bio-input" placeholder="Say a little about yourself…" maxlength="280">${esc(currentUser.user_metadata?.bio || '')}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Avatar Color</label>
+        <div class="color-pick" id="account-avatar-color-pick">
+          ${['#F59E0B','#F43F5E','#6366F1','#06B6D4','#10B981','#8B5CF6'].map(c =>
+            `<div class="color-swatch${(currentUser.user_metadata?.avatar_color || '#F59E0B') === c ? ' selected' : ''}" data-color="${c}" style="background:${c}"></div>`
+          ).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:6px;">
+        <button class="btn btn-primary btn-sm" id="account-save-public-btn" onclick="saveAccountPublicProfile()">Save Profile</button>
+        <button class="btn btn-ghost btn-sm" onclick="showProfile('${currentUser.id}', 'account-settings')">View My Public Profile →</button>
       </div>
     </div>
   ` : `
@@ -1584,13 +1687,89 @@ async function renderProfile() {
         </div>
       ` : `
         <p style="color:var(--muted);font-size:0.88rem;margin-bottom:14px;">Sign in with the admin password to create and manage events.</p>
-        <button class="btn btn-primary" onclick="requireAdmin(()=>{ if (currentView==='profile') renderProfile(); })">🔒 Admin Sign In</button>
+        <button class="btn btn-primary" onclick="requireAdmin(()=>{ if (currentView==='account-settings') renderAccountSettings(); })">🔒 Admin Sign In</button>
       `}
     </div>
   `;
 
   container.innerHTML = `<div class="profile-sections">${accountSectionHtml}${adminSectionHtml}</div>`;
+
+  if (currentUser) {
+    document.getElementById('account-avatar-color-pick').addEventListener('click', ev => {
+      const swatch = ev.target.closest('.color-swatch');
+      if (!swatch) return;
+      document.querySelectorAll('#account-avatar-color-pick .color-swatch').forEach(s => s.classList.toggle('selected', s === swatch));
+    });
+  }
 }
+
+async function saveAccountPublicProfile() {
+  const bio = document.getElementById('account-bio-input').value.trim();
+  const selectedSwatch = document.querySelector('#account-avatar-color-pick .color-swatch.selected');
+  const avatarColor = selectedSwatch ? selectedSwatch.dataset.color : '#F59E0B';
+
+  setBtnLoading('account-save-public-btn', true);
+  try {
+    const { data, error } = await sb.auth.updateUser({ data: { bio, avatar_color: avatarColor } });
+    if (error) throw error;
+    currentUser = data.user;
+    await syncPublicProfile();
+    showToast('Public profile updated ✓');
+  } catch(e) {
+    showToast('Error updating profile: ' + e.message, true);
+  } finally {
+    setBtnLoading('account-save-public-btn', false);
+  }
+}
+
+// Pushes the current user's name/bio/avatar_color into the publicly-readable
+// public_profiles table, via a security-definer RPC (auth.users isn't
+// directly queryable by other users from the client).
+async function syncPublicProfile() {
+  if (!currentUser) return;
+  try {
+    const { error } = await sb.rpc('sync_public_profile');
+    if (error) throw error;
+  } catch(e) {
+    console.error('Failed to sync public profile:', e);
+    // Non-fatal — the account update itself already succeeded.
+  }
+}
+
+// ─── PUBLIC PROFILE (anyone's profile page) ────────────────────────
+async function renderPublicProfile(userId) {
+  const container = document.getElementById('profile-content');
+  container.innerHTML = '';
+  try {
+    const { data, error } = await sb.from('public_profiles').select('*').eq('user_id', userId).maybeSingle();
+    if (error) throw error;
+
+    if (!data) {
+      container.innerHTML = `<div class="empty-state">
+        <div class="icon">👤</div>
+        <h3>Profile not found</h3>
+        <p>This person hasn't set up their public profile yet.</p>
+      </div>`;
+      return;
+    }
+
+    const name = data.name || 'Someone';
+    const initial = name[0] ? name[0].toUpperCase() : '?';
+    const color = data.avatar_color || '#F59E0B';
+    const isOwnProfile = currentUser && currentUser.id === userId;
+
+    container.innerHTML = `
+      <div class="panel" style="max-width:480px;text-align:center;">
+        <div class="avatar" style="width:64px;height:64px;font-size:1.6rem;background:${esc(color)};margin:0 auto 16px;">${esc(initial)}</div>
+        <h1 style="font-family:'Fraunces',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px;">${esc(name)}</h1>
+        ${data.bio ? `<p style="color:#C4BDB5;font-size:0.92rem;line-height:1.6;margin-top:10px;">${esc(data.bio)}</p>` : `<p style="color:var(--muted);font-size:0.85rem;font-style:italic;margin-top:10px;">No bio yet.</p>`}
+        ${isOwnProfile ? `<button class="btn btn-ghost btn-sm" style="margin-top:18px;" onclick="switchView('account-settings')">Edit My Profile</button>` : ''}
+      </div>`;
+  } catch(e) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><h3>Couldn't load profile</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
 
 function startEditProfileName() {
   const wrap = document.getElementById('profile-name-display');
@@ -1598,7 +1777,7 @@ function startEditProfileName() {
   wrap.innerHTML = `
     <input type="text" id="profile-name-input" value="${esc(userDisplayName())}" style="max-width:200px;">
     <button class="btn btn-primary btn-sm" id="profile-name-save-btn" onclick="saveProfileName()">Save</button>
-    <button class="btn btn-ghost btn-sm" onclick="renderProfile()">Cancel</button>`;
+    <button class="btn btn-ghost btn-sm" onclick="renderAccountSettings()">Cancel</button>`;
   document.getElementById('profile-name-input').focus();
   document.getElementById('profile-name-input').addEventListener('keydown', ev => {
     if (ev.key === 'Enter') saveProfileName();
@@ -1614,8 +1793,9 @@ async function saveProfileName() {
     const { data, error } = await sb.auth.updateUser({ data: { name: newName } });
     if (error) throw error;
     currentUser = data.user;
+    await syncPublicProfile();
     renderUserNav();
-    renderProfile();
+    renderAccountSettings();
     showToast('Name updated ✓');
   } catch(e) {
     showToast('Error updating name: ' + e.message, true);
@@ -1702,7 +1882,9 @@ function renderDetail() {
   rsvpList.innerHTML = sortedRsvps.length
     ? sortedRsvps.map(r => `<div class="rsvp-item">
         <div class="avatar">${r.name[0].toUpperCase()}</div>
-        <span class="name">${esc(r.name)}</span>
+        ${r.user_id
+          ? `<span class="name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--muted);" onclick="showProfile('${r.user_id}','detail')">${esc(r.name)}</span>`
+          : `<span class="name">${esc(r.name)}</span>`}
         ${r.note?`<span style="color:var(--muted);font-size:0.78rem;font-style:italic">"${esc(r.note)}"</span>`:''}
         <span class="badge badge-${r.status}">${r.status==='yes'?'Going':r.status==='maybe'?'Maybe':'Nope'}</span>
         ${isAdmin?`<button class="row-delete-btn" title="Remove this RSVP" onclick="requireAdmin(()=>deleteRsvp('${r.id}'))">🗑</button>`:''}
