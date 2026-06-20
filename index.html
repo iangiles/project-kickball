@@ -291,6 +291,7 @@
     <button class="nav-tab active" id="nav-tab-host" onclick="switchView('host')" style="display:none;">Event Manager</button>
     <button class="nav-tab" id="nav-tab-public" onclick="switchView('public')">Browse</button>
     <button class="nav-tab" id="nav-tab-mine" onclick="switchView('mine')">My Events</button>
+    <button class="nav-tab" id="nav-tab-about" onclick="switchView('about')">About</button>
   </div>
   <button class="nav-menu-toggle" id="nav-menu-toggle" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
   <div class="nav-right" id="nav-right">
@@ -605,6 +606,32 @@ where datetime is not null;</div>
     <div id="mine-past-section"></div>
   </div>
 
+  <!-- ABOUT VIEW -->
+  <div id="view-about" class="view">
+    <div class="dashboard-header">
+      <div><h1>About Galabanting</h1><p>What this is, and how it works.</p></div>
+    </div>
+    <div class="profile-sections">
+      <div class="panel">
+        <h2>🎉 What is this?</h2>
+        <p style="color:#C4BDB5;font-size:0.92rem;line-height:1.7;">Galabanting is a simple place to host gatherings, let people RSVP, and coordinate who's bringing what — no spreadsheets, no group texts gone wrong.</p>
+      </div>
+      <div class="panel">
+        <h2>✨ Features</h2>
+        <ul style="color:#C4BDB5;font-size:0.9rem;line-height:2;padding-left:20px;">
+          <li>Create events with date, location, a Google Maps link, and an optional RSVP limit</li>
+          <li>Guests sign in to RSVP and claim items to bring</li>
+          <li>Customizable public profiles with a name, bio, and avatar color</li>
+          <li>Light and dark mode</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2>🔒 Privacy</h2>
+        <p style="color:#C4BDB5;font-size:0.92rem;line-height:1.7;">Your RSVP name, bio, and avatar color are visible to other guests on shared events. Your email is never shown publicly.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- ACCOUNT SETTINGS VIEW (private — your own account & admin access) -->
   <div id="view-account-settings" class="view">
     <div class="dashboard-header">
@@ -669,6 +696,7 @@ where datetime is not null;</div>
       <div class="color-pick" id="color-pick">
         <div class="color-swatch selected" data-color="#F59E0B" style="background:#F59E0B"></div>
         <div class="color-swatch" data-color="#F43F5E" style="background:#F43F5E"></div>
+        <div class="color-swatch" data-color="#EC4899" style="background:#EC4899"></div>
         <div class="color-swatch" data-color="#6366F1" style="background:#6366F1"></div>
         <div class="color-swatch" data-color="#06B6D4" style="background:#06B6D4"></div>
         <div class="color-swatch" data-color="#10B981" style="background:#10B981"></div>
@@ -711,6 +739,7 @@ where datetime is not null;</div>
       <div class="color-pick" id="edit-color-pick">
         <div class="color-swatch selected" data-color="#F59E0B" style="background:#F59E0B"></div>
         <div class="color-swatch" data-color="#F43F5E" style="background:#F43F5E"></div>
+        <div class="color-swatch" data-color="#EC4899" style="background:#EC4899"></div>
         <div class="color-swatch" data-color="#6366F1" style="background:#6366F1"></div>
         <div class="color-swatch" data-color="#06B6D4" style="background:#06B6D4"></div>
         <div class="color-swatch" data-color="#10B981" style="background:#10B981"></div>
@@ -1472,7 +1501,7 @@ function switchView(v) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + v).classList.add('active');
   document.querySelectorAll('.nav-tabs .nav-tab').forEach(t => t.classList.remove('active'));
-  const tabMap = { host: 'nav-tab-host', public: 'nav-tab-public', mine: 'nav-tab-mine' };
+  const tabMap = { host: 'nav-tab-host', public: 'nav-tab-public', mine: 'nav-tab-mine', about: 'nav-tab-about' };
   if (tabMap[v]) document.getElementById(tabMap[v]).classList.add('active');
   if (v === 'host') renderHostDashboard();
   if (v === 'public') renderPublicEvents();
@@ -1693,7 +1722,7 @@ async function renderAccountSettings() {
       <div class="form-group">
         <label>Avatar Color</label>
         <div class="color-pick" id="account-avatar-color-pick">
-          ${['#F59E0B','#F43F5E','#6366F1','#06B6D4','#10B981','#8B5CF6'].map(c =>
+          ${['#F59E0B','#F43F5E','#EC4899','#6366F1','#06B6D4','#10B981','#8B5CF6'].map(c =>
             `<div class="color-swatch${(currentUser.user_metadata?.avatar_color || '#F59E0B') === c ? ' selected' : ''}" data-color="${c}" style="background:${c}"></div>`
           ).join('')}
         </div>
