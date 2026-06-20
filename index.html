@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Galabanting - Hangs n stuff</title>
+<script>
+  // Set the theme before first paint to avoid a flash of the wrong theme.
+  (function() {
+    try {
+      const saved = localStorage.getItem('gather_theme');
+      const theme = (saved === 'light' || saved === 'dark') ? saved
+        : ((window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark');
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch(e) { /* localStorage unavailable — default dark styles apply */ }
+  })();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,700;1,9..144,300&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -13,8 +24,16 @@
     --cream: #F7F3EE; --muted: #9CA3AF; --amber: #F59E0B;
     --rose: #F43F5E; --sage: #6B8F71; --blue: #6366F1;
     --border: rgba(255,255,255,0.08); --radius: 12px;
+    --hover-overlay: rgba(255,255,255,0.12); --hover-border: rgba(255,255,255,0.2);
   }
-  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--cream); min-height: 100vh; display: flex; flex-direction: column; }
+  :root[data-theme="light"] {
+    --bg: #F7F3EE; --surface: #FFFFFF; --card: #F1ECE4;
+    --cream: #1C1F2E; --muted: #6B7280; --amber: #D97706;
+    --rose: #E11D48; --sage: #4D7355; --blue: #4F46E5;
+    --border: rgba(28,31,46,0.1);
+    --hover-overlay: rgba(28,31,46,0.06); --hover-border: rgba(28,31,46,0.18);
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--cream); min-height: 100vh; display: flex; flex-direction: column; transition: background 0.2s, color 0.2s; }
 
   /* NAV */
   nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; gap: 12px; box-sizing: border-box; }
@@ -29,6 +48,14 @@
   .nav-admin-area { display: flex; align-items: center; gap: 10px; }
   .nav-user-area { display: flex; align-items: center; gap: 10px; }
   .nav-menu-toggle { display: none; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--cream); width: 38px; height: 38px; align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; flex-shrink: 0; }
+  .theme-toggle-btn {
+    background: var(--card); border: 1px solid var(--border); border-radius: 99px;
+    width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 1.1rem; flex-shrink: 0; transition: background 0.15s, transform 0.15s;
+  }
+  .theme-toggle-btn:hover { background: var(--hover-overlay); transform: rotate(15deg); }
+  .theme-toggle-btn::before { content: '🌙'; }
+  :root[data-theme="light"] .theme-toggle-btn::before { content: '☀️'; }
 
   @media (max-width: 760px) {
     nav { padding: 0 16px; flex-wrap: wrap; }
@@ -58,7 +85,7 @@
   .btn-rose { background: var(--rose); color: white; }
   .btn-rose:hover { background: #FB5573; }
   .btn-ghost { background: var(--border); color: var(--cream); border: 1px solid var(--border); }
-  .btn-ghost:hover { background: rgba(255,255,255,0.12); }
+  .btn-ghost:hover { background: var(--hover-overlay); }
   .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
   .btn-danger { background: rgba(244,63,94,0.15); color: var(--rose); border: 1px solid rgba(244,63,94,0.3); }
   .btn-danger:hover { background: rgba(244,63,94,0.25); }
@@ -119,7 +146,7 @@
     text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;
   }
   .event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; cursor: pointer; transition: border-color 0.15s, transform 0.15s; position: relative; overflow: hidden; }
-  .event-card:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
+  .event-card:hover { border-color: var(--hover-border); transform: translateY(-2px); }
   .event-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent, var(--amber)); }
   .event-card-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent, var(--amber)); margin-bottom: 8px; }
   .event-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 600; margin-bottom: 6px; line-height: 1.2; }
@@ -267,6 +294,7 @@
   </div>
   <button class="nav-menu-toggle" id="nav-menu-toggle" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
   <div class="nav-right" id="nav-right">
+    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle light/dark mode" title="Toggle light/dark mode"></button>
     <div class="nav-user-area" id="nav-user-area"></div>
   </div>
 </nav>
@@ -990,6 +1018,27 @@ function showLoading(msg) {
   document.getElementById('loading').classList.add('active');
 }
 function hideLoading() { document.getElementById('loading').classList.remove('active'); }
+
+// ─── THEME (light/dark mode) ───────────────────────────────────────
+const THEME_KEY = 'gather_theme';
+function getPreferredTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'light' || saved === 'dark') return saved;
+  // No explicit choice saved yet — fall back to the OS/browser preference
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  applyTheme(next);
+  localStorage.setItem(THEME_KEY, next);
+}
+// Apply immediately on script load (before the rest of the app renders)
+// to avoid a flash of the wrong theme.
+applyTheme(getPreferredTheme());
 
 // ─── STATE ────────────────────────────────────────────────────────
 let currentEventId = null;
