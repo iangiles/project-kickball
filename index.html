@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Galabanting - Hangs n stuff</title>
+<title>Gather — Event Hosting</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,700;1,9..144,300&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -100,25 +100,24 @@
 
   /* PAST EVENTS */
   .past-events-section { margin-top: 36px; }
-  .past-events-toggle {
+  .past-events-heading {
     display: flex; align-items: center; gap: 8px;
-    background: none; border: none; cursor: pointer;
     color: var(--muted); font-family: 'Inter', sans-serif;
     font-size: 0.92rem; font-weight: 600; padding: 10px 0;
-    width: 100%; border-top: 1px solid var(--border);
-    transition: color 0.15s;
+    border-top: 1px solid var(--border);
   }
-  .past-events-toggle:hover { color: var(--cream); }
-  .past-events-toggle .chevron { transition: transform 0.2s; font-size: 0.75rem; }
-  .past-events-toggle.open .chevron { transform: rotate(90deg); }
-  .past-events-toggle .count-pill {
+  .past-events-heading .count-pill {
     background: var(--card); color: var(--muted); font-size: 0.72rem; font-weight: 600;
     padding: 2px 9px; border-radius: 99px; margin-left: 2px;
   }
-  .past-events-body { display: none; margin-top: 18px; }
-  .past-events-body.open { display: block; }
+  .past-events-body { margin-top: 18px; }
   .past-events-body .event-card { opacity: 0.72; }
   .past-events-body .event-card:hover { opacity: 1; }
+  .past-event-notice {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; font-size: 0.84rem; color: var(--muted);
+    text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
   .event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; cursor: pointer; transition: border-color 0.15s, transform 0.15s; position: relative; overflow: hidden; }
   .event-card:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
   .event-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent, var(--amber)); }
@@ -246,7 +245,7 @@
 <body>
 
 <nav>
-  <div class="logo">Galabanting</div>
+  <div class="logo">gather<span>.</span></div>
   <div class="nav-tabs" id="nav-tabs" style="display:none;">
     <button class="nav-tab active" id="nav-tab-host" onclick="switchView('host')" style="display:none;">Event Manager</button>
     <button class="nav-tab" id="nav-tab-public" onclick="switchView('public')">Browse</button>
@@ -332,9 +331,57 @@ alter table items add column if not exists claimed_by_user_id uuid references au
 
 -- Let logged-in users update their own RSVP instead of creating duplicates
 drop policy if exists "users update own rsvps" on rsvps;
-create policy "users update own rsvps" on rsvps for update using (auth.uid() = user_id);</div>
+create policy "users update own rsvps" on rsvps for update using (auth.uid() = user_id);
+
+-- Require sign-in to RSVP or claim/add items (guests can still browse & read everything)
+drop policy if exists "public insert rsvps" on rsvps;
+create policy "signed in users insert rsvps" on rsvps
+  for insert with check (auth.uid() is not null and auth.uid() = user_id);
+
+drop policy if exists "public insert items" on items;
+create policy "signed in users insert items" on items
+  for insert with check (
+    auth.uid() is not null and (claimed_by_user_id is null or claimed_by_user_id = auth.uid())
+  );
+
+-- Item updates stay open (admins edit item lists via a separate app-level password,
+-- not Supabase Auth, so this can't be locked to auth.uid() without breaking that).
+-- Sign-in for claiming is enforced in the app UI via requireUser().
+
+-- Block RSVPs and item sign-ups for events whose date has already passed.
+-- (An event with no datetime set is never considered "past".)
+drop policy if exists "signed in users insert rsvps" on rsvps;
+create policy "signed in users insert rsvps" on rsvps
+  for insert with check (
+    auth.uid() is not null and auth.uid() = user_id
+    and not exists (
+      select 1 from events where events.id = rsvps.event_id
+      and events.datetime is not null and events.datetime < now()
+    )
+  );
+
+drop policy if exists "users update own rsvps" on rsvps;
+create policy "users update own rsvps" on rsvps
+  for update using (
+    auth.uid() = user_id
+    and not exists (
+      select 1 from events where events.id = rsvps.event_id
+      and events.datetime is not null and events.datetime < now()
+    )
+  );
+
+drop policy if exists "signed in users insert items" on items;
+create policy "signed in users insert items" on items
+  for insert with check (
+    auth.uid() is not null and (claimed_by_user_id is null or claimed_by_user_id = auth.uid())
+    and not exists (
+      select 1 from events where events.id = items.event_id
+      and events.datetime is not null and events.datetime < now()
+    )
+  );</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
+    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ The last block blocks RSVPs and item sign-ups for events whose date has already passed, at the database level — not just in the app's UI.</p>
 
     <div class="setup-steps" style="margin-top:16px;">
       <div class="setup-step"><p>Go to <strong>Project Settings → API</strong>. Copy your <code>Project URL</code> and <code>anon public</code> key below.</p></div>
@@ -415,13 +462,13 @@ create policy "users update own rsvps" on rsvps for update using (auth.uid() = u
       <div class="panel">
         <h2>🙋 RSVPs <span id="rsvp-count-badge" style="font-size:0.8rem;font-weight:400;color:var(--muted);"></span></h2>
         <div id="rsvp-list" class="rsvp-list"></div>
-        <button class="btn btn-primary" style="margin-top:14px;width:100%;" onclick="openRsvpModal()">RSVP to this event</button>
+        <div id="rsvp-action" style="margin-top:14px;"></div>
       </div>
       <div class="panel">
         <h2>🧺 Sign-up List</h2>
         <div id="items-progress" style="margin-bottom:14px;"></div>
         <div id="items-list" class="items-list"></div>
-        <button class="btn btn-ghost" style="margin-top:14px;width:100%;" onclick="openClaimModal()">Claim an item</button>
+        <div id="claim-action" style="margin-top:14px;"></div>
       </div>
     </div>
   </div>
@@ -830,29 +877,20 @@ function splitUpcomingPast(events) {
   return { upcoming, past };
 }
 
-// Renders a collapsible "Past Events" section into the given container.
+// Renders an always-visible "Past Events" section into the given container.
 // cardBuilder(event) should return the HTML string for one event card.
 function renderPastSection(containerId, pastEvents, cardBuilder, toggleKey) {
   const container = document.getElementById(containerId);
   if (!pastEvents.length) { container.innerHTML = ''; return; }
-  const wasOpen = pastSectionOpenState[toggleKey] === true;
   container.innerHTML = `
     <div class="past-events-section">
-      <button class="past-events-toggle${wasOpen ? ' open' : ''}" onclick="togglePastSection('${toggleKey}')">
-        <span class="chevron">▶</span> Past Events <span class="count-pill">${pastEvents.length}</span>
-      </button>
-      <div class="past-events-body${wasOpen ? ' open' : ''}" id="past-body-${toggleKey}">
+      <div class="past-events-heading">
+        Past Events <span class="count-pill">${pastEvents.length}</span>
+      </div>
+      <div class="past-events-body">
         <div class="events-grid">${pastEvents.map(cardBuilder).join('')}</div>
       </div>
     </div>`;
-}
-const pastSectionOpenState = {};
-function togglePastSection(key) {
-  pastSectionOpenState[key] = !pastSectionOpenState[key];
-  const toggle = document.querySelector(`.past-events-toggle[onclick="togglePastSection('${key}')"]`);
-  const body = document.getElementById('past-body-' + key);
-  toggle.classList.toggle('open', pastSectionOpenState[key]);
-  body.classList.toggle('open', pastSectionOpenState[key]);
 }
 
 // ─── USER ACCOUNTS ────────────────────────────────────────────────
@@ -898,24 +936,36 @@ function renderUserNav() {
 }
 
 let authMode = 'login';
+let pendingUserAction = null;
+let authRequiredMessage = '';
+
 function setAuthTab(mode) {
   authMode = mode;
   document.getElementById('auth-tab-login').classList.toggle('active', mode === 'login');
   document.getElementById('auth-tab-signup').classList.toggle('active', mode === 'signup');
   document.getElementById('auth-title').textContent = mode === 'login' ? 'Welcome back' : 'Create your account';
-  document.getElementById('auth-sub').textContent = mode === 'login'
+  document.getElementById('auth-sub').textContent = authRequiredMessage || (mode === 'login'
     ? 'Sign in to track which events you\'re going to.'
-    : 'Save your name so RSVPs and item sign-ups are one click.';
+    : 'Save your name so RSVPs and item sign-ups are one click.');
   document.getElementById('auth-name-wrap').style.display = mode === 'signup' ? '' : 'none';
   document.getElementById('auth-submit-btn').textContent = mode === 'login' ? 'Sign In' : 'Create Account';
   document.getElementById('auth-error').classList.remove('show');
 }
 
-function openAuthModal(mode) {
+function openAuthModal(mode, message) {
+  authRequiredMessage = message || '';
   setAuthTab(mode || 'login');
   ['auth-name','auth-email','auth-password'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('auth-error').classList.remove('show');
   openModal('modal-auth');
+}
+
+// Gate an action behind being signed in — if already signed in, runs immediately;
+// otherwise opens the sign-in modal and resumes the action after a successful login/signup.
+function requireUser(action, message) {
+  if (currentUser) { action(); return; }
+  pendingUserAction = action;
+  openAuthModal('login', message);
 }
 
 async function submitAuth() {
@@ -940,6 +990,7 @@ async function submitAuth() {
         showToast(`Welcome, ${name}! 🎉`);
       } else {
         showToast('Account created! Check your email to confirm, then sign in.');
+        pendingUserAction = null; // can't resume — not actually signed in yet (email confirmation pending)
       }
     } else {
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
@@ -950,6 +1001,11 @@ async function submitAuth() {
       showToast(`Welcome back, ${userDisplayName()}! 👋`);
     }
     if (currentView === 'mine') renderMyEvents();
+    if (currentUser && pendingUserAction) {
+      const action = pendingUserAction;
+      pendingUserAction = null;
+      action();
+    }
   } catch(e) {
     errEl.textContent = e.message || 'Something went wrong.';
     errEl.classList.add('show');
@@ -1441,6 +1497,19 @@ function renderDetail() {
         ${it.claimed_by?`<span class="item-claimer">✓ ${esc(it.claimed_by)}</span>`:'<span style="color:var(--muted);font-size:0.75rem;">Open</span>'}
       </div>`).join('')
     : '<p style="color:var(--muted);font-size:0.85rem;">No items needed — just bring yourself!</p>';
+
+  // RSVP / claim actions — disabled once the event is in the past
+  if (isPastEvent(e)) {
+    document.getElementById('rsvp-action').innerHTML =
+      `<div class="past-event-notice">🕒 This event has already happened — RSVPs are closed.</div>`;
+    document.getElementById('claim-action').innerHTML =
+      `<div class="past-event-notice">🕒 This event has already happened — sign-ups are closed.</div>`;
+  } else {
+    document.getElementById('rsvp-action').innerHTML =
+      `<button class="btn btn-primary" style="width:100%;" onclick="requireUser(openRsvpModal, 'Sign in to RSVP to this event.')">RSVP to this event</button>`;
+    document.getElementById('claim-action').innerHTML =
+      `<button class="btn btn-ghost" style="width:100%;" onclick="requireUser(openClaimModal, 'Sign in to claim an item to bring.')">Claim an item</button>`;
+  }
 }
 
 // ─── CREATE EVENT ─────────────────────────────────────────────────
