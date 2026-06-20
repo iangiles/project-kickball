@@ -1924,6 +1924,24 @@ async function submitRsvp() {
         .eq('id', existing.id);
       if (error) throw error;
     } else {
+      // Diagnostics: ask the database directly what it thinks "now" and the
+      // yes-count are, rather than inferring from data we already have cached.
+      try {
+        const { data: countResult, error: countErr } = await sb.rpc('yes_rsvp_count', { p_event_id: currentEventId });
+        const { data: nowResult } = await sb.from('events').select('datetime').eq('id', currentEventId).single();
+        console.log('RSVP DB diagnostic:', {
+          dbYesCount: countResult,
+          countErr,
+          eventDatetimeRaw: nowResult?.datetime,
+          browserNowUTC: new Date().toISOString(),
+          eventLimit: e.rsvp_limit,
+          submittingStatus: selectedRsvpStatus,
+          userId: currentUser?.id
+        });
+      } catch(diagErr) {
+        console.log('Diagnostic query failed:', diagErr);
+      }
+
       const { error } = await sb.from('rsvps').insert({
         event_id: currentEventId,
         name,
