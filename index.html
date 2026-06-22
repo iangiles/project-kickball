@@ -389,6 +389,25 @@ create policy "users delete own comments" on comments
 create policy "public delete comments admin" on comments
   for delete using (true);
 
+-- Comments on public profiles ("What others say about…")
+create table if not exists profile_comments (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid not null references auth.users(id),
+  body text not null,
+  created_at timestamptz default now(),
+  -- Prevent the profile owner from commenting on their own profile
+  constraint no_self_comment check (profile_id != user_id)
+);
+alter table profile_comments enable row level security;
+create policy "public read profile comments" on profile_comments for select using (true);
+create policy "signed in non-owners insert profile comments" on profile_comments
+  for insert with check (auth.uid() is not null and auth.uid() = user_id and auth.uid() != profile_id);
+create policy "users delete own profile comments" on profile_comments
+  for delete using (auth.uid() = user_id);
+create policy "public delete profile comments admin" on profile_comments
+  for delete using (true);
+
 -- Shared admin password (stored as a SHA-256 hash, synced across all browsers)
 create table if not exists settings (
   key text primary key,
@@ -1888,14 +1907,20 @@ async function syncPublicProfile() {
 }
 
 // ─── PUBLIC PROFILE (anyone's profile page) ────────────────────────
+let viewingProfileUserId = null;
+
 async function renderPublicProfile(userId) {
+  viewingProfileUserId = userId;
   const container = document.getElementById('profile-content');
   container.innerHTML = '';
   try {
-    const { data, error } = await sb.from('public_profiles').select('*').eq('user_id', userId).maybeSingle();
-    if (error) throw error;
+    const [profileRes, commentsRes] = await Promise.all([
+      sb.from('public_profiles').select('*').eq('user_id', userId).maybeSingle(),
+      sb.from('profile_comments').select('*').eq('profile_id', userId).order('created_at')
+    ]);
+    if (profileRes.error) throw profileRes.error;
 
-    if (!data) {
+    if (!profileRes.data) {
       container.innerHTML = `<div class="empty-state">
         <div class="icon">👤</div>
         <h3>Profile not found</h3>
@@ -1904,20 +1929,122 @@ async function renderPublicProfile(userId) {
       return;
     }
 
+    const data = profileRes.data;
+    const comments = commentsRes.data || [];
     const name = data.name || 'Someone';
     const initial = name[0] ? name[0].toUpperCase() : '?';
     const color = data.avatar_color || '#F59E0B';
     const isOwnProfile = currentUser && currentUser.id === userId;
+    const isAdmin = isAdminLoggedIn();
+
+    // Batch-fetch commenter names + colors
+    let commentorColors = {}, commentorNames = {};
+    const commenterIds = [...new Set(comments.map(c => c.user_id).filter(Boolean))];
+    if (commenterIds.length) {
+      try {
+        const { data: profiles } = await sb.from('public_profiles').select('user_id, name, avatar_color').in('user_id', commenterIds);
+        (profiles || []).forEach(p => {
+          commentorColors[p.user_id] = p.avatar_color || '#F59E0B';
+          commentorNames[p.user_id] = p.name || 'Someone';
+        });
+      } catch(e) { /* non-fatal */ }
+    }
+
+    const commentRowsHtml = comments.length
+      ? comments.map(c => {
+          const cColor = commentorColors[c.user_id] || '#F59E0B';
+          const cName = commentorNames[c.user_id] || 'Someone';
+          const cInitial = cName[0].toUpperCase();
+          const ts = new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+          const canDelete = isAdmin || (currentUser && currentUser.id === c.user_id);
+          return `<div class="comment-item">
+            <div class="avatar" style="background:${esc(cColor)};flex-shrink:0;align-self:flex-start;">${esc(cInitial)}</div>
+            <div class="comment-body-wrap">
+              <div class="comment-header">
+                <span class="comment-author" onclick="showProfile('${c.user_id}','profile')">${esc(cName)}</span>
+                <span class="comment-timestamp">${ts}</span>
+                ${canDelete ? `<button class="comment-delete-btn" title="Delete comment" onclick="deleteProfileComment('${c.id}','${userId}')">🗑</button>` : ''}
+              </div>
+              <div class="comment-text">${esc(c.body)}</div>
+            </div>
+          </div>`;
+        }).join('')
+      : `<p style="color:var(--muted);font-size:0.85rem;">Nothing yet — be the first to say something!</p>`;
+
+    let composerHtml = '';
+    if (!currentUser) {
+      composerHtml = `<button class="btn btn-ghost btn-sm" onclick="requireUser(()=>renderPublicProfile('${userId}'), 'Sign in to leave a comment.')">Sign in to comment</button>`;
+    } else if (isOwnProfile) {
+      composerHtml = `<p style="color:var(--muted);font-size:0.82rem;font-style:italic;">You can't comment on your own profile.</p>`;
+    } else {
+      const myColor = userAvatarColor();
+      const myInitial = userInitial();
+      composerHtml = `<div class="comment-composer">
+        <div class="avatar" style="background:${esc(myColor)};flex-shrink:0;align-self:flex-end;">${esc(myInitial)}</div>
+        <textarea id="profile-comment-input" placeholder="Say something nice…" rows="2" maxlength="500"
+          onkeydown="handleProfileCommentKey(event,'${userId}')"></textarea>
+        <button class="btn btn-primary btn-sm" id="profile-comment-submit-btn" onclick="submitProfileComment('${userId}')" style="flex-shrink:0;">Post</button>
+      </div>`;
+    }
 
     container.innerHTML = `
-      <div class="panel" style="max-width:480px;text-align:center;">
-        <div class="avatar" style="width:64px;height:64px;font-size:1.6rem;background:${esc(color)};margin:0 auto 16px;">${esc(initial)}</div>
-        <h1 style="font-family:'Fraunces',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px;">${esc(name)}</h1>
-        ${data.bio ? `<p style="color:#C4BDB5;font-size:0.92rem;line-height:1.6;margin-top:10px;">${esc(data.bio)}</p>` : `<p style="color:var(--muted);font-size:0.85rem;font-style:italic;margin-top:10px;">No bio yet.</p>`}
-        ${isOwnProfile ? `<button class="btn btn-ghost btn-sm" style="margin-top:18px;" onclick="switchView('account-settings')">Edit My Profile</button>` : ''}
+      <div style="max-width:560px;">
+        <div class="panel" style="text-align:center;margin-bottom:20px;">
+          <div class="avatar" style="width:64px;height:64px;font-size:1.6rem;background:${esc(color)};margin:0 auto 16px;">${esc(initial)}</div>
+          <h1 style="font-family:'Fraunces',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px;">${esc(name)}</h1>
+          ${data.bio ? `<p style="color:#C4BDB5;font-size:0.92rem;line-height:1.6;margin-top:10px;">${esc(data.bio)}</p>` : `<p style="color:var(--muted);font-size:0.85rem;font-style:italic;margin-top:10px;">No bio yet.</p>`}
+          ${isOwnProfile ? `<button class="btn btn-ghost btn-sm" style="margin-top:18px;" onclick="switchView('account-settings')">Edit My Profile</button>` : ''}
+        </div>
+        <div class="panel">
+          <h2 style="margin-bottom:16px;">💬 What others say about ${esc(name)}</h2>
+          <div class="comments-list" style="margin-bottom:16px;">${commentRowsHtml}</div>
+          <div id="profile-comment-composer">${composerHtml}</div>
+        </div>
       </div>`;
   } catch(e) {
     container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><h3>Couldn't load profile</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+async function submitProfileComment(profileId) {
+  const input = document.getElementById('profile-comment-input');
+  if (!input) return;
+  const body = input.value.trim();
+  if (!body) return;
+  if (!currentUser) { requireUser(() => renderPublicProfile(profileId), 'Sign in to leave a comment.'); return; }
+  if (currentUser.id === profileId) return;
+
+  setBtnLoading('profile-comment-submit-btn', true);
+  try {
+    const { error } = await sb.from('profile_comments').insert({
+      profile_id: profileId,
+      user_id: currentUser.id,
+      body
+    });
+    if (error) throw error;
+    await renderPublicProfile(profileId);
+  } catch(e) {
+    showToast('Error posting comment: ' + e.message, true);
+    setBtnLoading('profile-comment-submit-btn', false);
+  }
+}
+
+function handleProfileCommentKey(ev, profileId) {
+  if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+    ev.preventDefault();
+    submitProfileComment(profileId);
+  }
+}
+
+async function deleteProfileComment(commentId, profileId) {
+  if (!confirm('Delete this comment?')) return;
+  try {
+    const { error } = await sb.from('profile_comments').delete().eq('id', commentId);
+    if (error) throw error;
+    await renderPublicProfile(profileId);
+    showToast('Comment deleted.');
+  } catch(e) {
+    showToast('Error deleting comment: ' + e.message, true);
   }
 }
 
