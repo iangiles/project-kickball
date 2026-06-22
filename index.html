@@ -429,6 +429,7 @@ create policy "public delete rsvps" on rsvps for delete using (true);
 
 -- Google Maps link for the event location, and an optional cap on "yes" RSVPs
 alter table events add column if not exists maps_url text;
+alter table events add column if not exists album_url text;
 alter table events add column if not exists rsvp_limit integer;
 
 -- Helper function to count confirmed ("yes") RSVPs for an event.
@@ -684,6 +685,11 @@ where datetime is not null;</div>
     </div>
     <div class="form-group"><label>Description</label><textarea id="new-desc" placeholder="Tell guests what to expect…"></textarea></div>
     <div class="form-group">
+      <label>Photo Album Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="url" id="new-album-url" placeholder="https://photos.google.com/... or similar">
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Link to a shared album — shown on the event page after it's created.</p>
+    </div>
+    <div class="form-group">
       <label>RSVP Limit <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
       <input type="number" id="new-rsvp-limit" min="1" placeholder="Leave blank for unlimited">
       <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Caps the number of guests who can RSVP "Yes."</p>
@@ -726,6 +732,11 @@ where datetime is not null;</div>
       <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">If set, guests can tap the location name to open it in Google Maps.</p>
     </div>
     <div class="form-group"><label>Description</label><textarea id="edit-desc" placeholder="Tell guests what to expect…"></textarea></div>
+    <div class="form-group">
+      <label>Photo Album Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="url" id="edit-album-url" placeholder="https://photos.google.com/... or similar">
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Link to a shared album — shown on the event page after it's created.</p>
+    </div>
     <div class="form-group">
       <label>RSVP Limit <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
       <input type="number" id="edit-rsvp-limit" min="1" placeholder="Leave blank for unlimited">
@@ -1962,7 +1973,10 @@ function renderDetail() {
       <div style="font-size:0.75rem;color:var(--muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.05em;">Share this event</div>
       <div class="share-url">${shareUrl}</div>
     </div>
-    <button class="btn btn-ghost btn-sm" onclick="copyLink('${shareUrl}')">Copy Link</button>`;
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      ${e.album_url ? `<a href="${esc(e.album_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm">📷 Photo Album</a>` : ''}
+      <button class="btn btn-ghost btn-sm" onclick="copyLink('${shareUrl}')">Copy Link</button>
+    </div>`;
 
   document.getElementById('detail-actions').innerHTML = isAdminLoggedIn()
     ? `<button class="btn btn-danger btn-sm" onclick="requireAdmin(()=>deleteEvent('${e.id}'))">🗑 Delete Event</button>` : '';
@@ -2028,7 +2042,7 @@ function renderDetail() {
 
 // ─── CREATE EVENT ─────────────────────────────────────────────────
 function openCreateModal() {
-  ['new-title','new-datetime','new-location','new-maps-url','new-desc','new-rsvp-limit'].forEach(id => document.getElementById(id).value = '');
+  ['new-title','new-datetime','new-location','new-maps-url','new-album-url','new-desc','new-rsvp-limit'].forEach(id => document.getElementById(id).value = '');
   selectedColor = '#F59E0B';
   document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s.dataset.color === selectedColor));
   document.getElementById('items-builder').innerHTML = '';
@@ -2060,6 +2074,9 @@ async function createNewEvent() {
   const mapsUrlRaw = document.getElementById('new-maps-url').value.trim();
   if (mapsUrlRaw && !isValidUrl(mapsUrlRaw)) { showToast('Please enter a valid Google Maps URL (starting with http:// or https://).', true); return; }
 
+  const albumUrlRaw = document.getElementById('new-album-url').value.trim();
+  if (albumUrlRaw && !isValidUrl(albumUrlRaw)) { showToast('Please enter a valid album URL (starting with http:// or https://).', true); return; }
+
   const rsvpLimitRaw = document.getElementById('new-rsvp-limit').value.trim();
   const rsvpLimit = rsvpLimitRaw ? parseInt(rsvpLimitRaw) : null;
   if (rsvpLimitRaw && (!Number.isInteger(rsvpLimit) || rsvpLimit < 1)) { showToast('RSVP limit must be a whole number of 1 or more.', true); return; }
@@ -2081,6 +2098,7 @@ async function createNewEvent() {
       datetime: localDtInputToUTC(document.getElementById('new-datetime').value),
       location: document.getElementById('new-location').value.trim() || null,
       maps_url: mapsUrlRaw || null,
+      album_url: albumUrlRaw || null,
       description: document.getElementById('new-desc').value.trim() || null,
       color: selectedColor,
       rsvp_limit: rsvpLimit
@@ -2132,6 +2150,7 @@ async function openEditModal(eventId) {
     document.getElementById('edit-datetime').value = dtToInputVal(e.datetime);
     document.getElementById('edit-location').value = e.location || '';
     document.getElementById('edit-maps-url').value = e.maps_url || '';
+    document.getElementById('edit-album-url').value = e.album_url || '';
     document.getElementById('edit-desc').value = e.description || '';
     document.getElementById('edit-rsvp-limit').value = e.rsvp_limit != null ? e.rsvp_limit : '';
     document.getElementById('edit-modal-sub').textContent = `Editing: ${e.title}`;
@@ -2182,6 +2201,9 @@ async function saveEditedEvent() {
   const mapsUrlRaw = document.getElementById('edit-maps-url').value.trim();
   if (mapsUrlRaw && !isValidUrl(mapsUrlRaw)) { showToast('Please enter a valid Google Maps URL (starting with http:// or https://).', true); return; }
 
+  const albumUrlRaw = document.getElementById('edit-album-url').value.trim();
+  if (albumUrlRaw && !isValidUrl(albumUrlRaw)) { showToast('Please enter a valid album URL (starting with http:// or https://).', true); return; }
+
   const rsvpLimitRaw = document.getElementById('edit-rsvp-limit').value.trim();
   const rsvpLimit = rsvpLimitRaw ? parseInt(rsvpLimitRaw) : null;
   if (rsvpLimitRaw && (!Number.isInteger(rsvpLimit) || rsvpLimit < 1)) { showToast('RSVP limit must be a whole number of 1 or more.', true); return; }
@@ -2203,6 +2225,7 @@ async function saveEditedEvent() {
       datetime: localDtInputToUTC(document.getElementById('edit-datetime').value),
       location: document.getElementById('edit-location').value.trim() || null,
       maps_url: mapsUrlRaw || null,
+      album_url: albumUrlRaw || null,
       description: document.getElementById('edit-desc').value.trim() || null,
       color: editSelectedColor,
       rsvp_limit: rsvpLimit
