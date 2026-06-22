@@ -207,6 +207,21 @@
   .comment-composer { display: flex; gap: 10px; align-items: flex-end; }
   .comment-composer textarea { flex: 1; resize: none; min-height: 60px; max-height: 160px; border-radius: 10px; font-size: 0.88rem; line-height: 1.5; }
   .comment-composer textarea:focus { border-color: var(--amber); }
+
+  /* EVENT BADGES on profiles */
+  .badges-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+  .event-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 13px; border-radius: 99px; font-size: 0.82rem; font-weight: 600;
+    color: #fff; cursor: default; position: relative;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .event-badge:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+  .event-badge .badge-emoji { font-size: 1rem; line-height: 1; }
+  .event-badge .badge-text { display: flex; flex-direction: column; line-height: 1.2; }
+  .event-badge .badge-name { font-size: 0.8rem; }
+  .event-badge .badge-date { font-size: 0.68rem; opacity: 0.85; font-weight: 400; }
   .rsvp-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border-radius: 8px; font-size: 0.88rem; }
   .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--amber); color: #1C1F2E; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
   .rsvp-item .name { font-weight: 500; flex: 1; }
@@ -482,6 +497,8 @@ create policy "public delete rsvps" on rsvps for delete using (true);
 alter table events add column if not exists maps_url text;
 alter table events add column if not exists album_url text;
 alter table events add column if not exists rsvp_limit integer;
+alter table events add column if not exists badge_emoji text default '🎉';
+alter table events add column if not exists badge_label text;
 
 -- Helper function to count confirmed ("yes") RSVPs for an event.
 -- SECURITY DEFINER lets it bypass RLS internally so it can be safely called
@@ -579,7 +596,40 @@ begin
 end;
 $$;
 
-grant execute on function public.sync_public_profile() to authenticated;</div>
+grant execute on function public.sync_public_profile() to authenticated;
+
+-- Returns badges earned by a specific user: one badge per past event they RSVPd "yes" to.
+-- Uses SECURITY DEFINER so it can safely join rsvps + events without RLS interference.
+create or replace function public.get_earned_badges(p_user_id uuid)
+returns table (
+  event_id uuid,
+  event_title text,
+  event_color text,
+  event_datetime timestamptz,
+  badge_emoji text,
+  badge_label text
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    e.id as event_id,
+    e.title as event_title,
+    coalesce(e.color, '#F59E0B') as event_color,
+    e.datetime as event_datetime,
+    coalesce(e.badge_emoji, '🎉') as badge_emoji,
+    coalesce(e.badge_label, e.title) as badge_label
+  from rsvps r
+  join events e on e.id = r.event_id
+  where r.user_id = p_user_id
+    and r.status = 'yes'
+    and e.datetime is not null
+    and e.datetime < now()
+  order by e.datetime desc;
+$$;
+
+grant execute on function public.get_earned_badges(uuid) to anon, authenticated;</div>
     <button class="copy-sql-btn" onclick="copySql('public-profiles-sql')">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Powers public profile pages, viewable by clicking a name on the RSVP list.</p>
 
@@ -765,6 +815,13 @@ where datetime is not null;</div>
       </div>
     </div>
     <div class="form-group">
+      <label>Attendance Badge <span style="text-transform:none;font-weight:400;color:var(--muted);">(shown on profiles of guests who attended)</span></label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="new-badge-emoji" placeholder="🎉" style="width:64px;text-align:center;font-size:1.2rem;" maxlength="4">
+        <input type="text" id="new-badge-label" placeholder="Badge label (defaults to event name)">
+      </div>
+    </div>
+    <div class="form-group">
       <label>Items Guests Can Bring</label>
       <div class="items-builder" id="items-builder"></div>
       <button class="add-item-btn" onclick="addItemRow()">+ Add item</button>
@@ -810,6 +867,13 @@ where datetime is not null;</div>
         <div class="color-swatch" data-color="#06B6D4" style="background:#06B6D4"></div>
         <div class="color-swatch" data-color="#10B981" style="background:#10B981"></div>
         <div class="color-swatch" data-color="#8B5CF6" style="background:#8B5CF6"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Attendance Badge <span style="text-transform:none;font-weight:400;color:var(--muted);">(shown on profiles of guests who attended)</span></label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="edit-badge-emoji" placeholder="🎉" style="width:64px;text-align:center;font-size:1.2rem;" maxlength="4">
+        <input type="text" id="edit-badge-label" placeholder="Badge label (defaults to event name)">
       </div>
     </div>
     <div class="form-group">
@@ -1914,9 +1978,10 @@ async function renderPublicProfile(userId) {
   const container = document.getElementById('profile-content');
   container.innerHTML = '';
   try {
-    const [profileRes, commentsRes] = await Promise.all([
+    const [profileRes, commentsRes, badgesRes] = await Promise.all([
       sb.from('public_profiles').select('*').eq('user_id', userId).maybeSingle(),
-      sb.from('profile_comments').select('*').eq('profile_id', userId).order('created_at')
+      sb.from('profile_comments').select('*').eq('profile_id', userId).order('created_at'),
+      sb.rpc('get_earned_badges', { p_user_id: userId })
     ]);
     if (profileRes.error) throw profileRes.error;
 
@@ -1929,6 +1994,7 @@ async function renderPublicProfile(userId) {
       return;
     }
 
+    const badges = badgesRes.data || [];
     const data = profileRes.data;
     const comments = commentsRes.data || [];
     const name = data.name || 'Someone';
@@ -1987,6 +2053,19 @@ async function renderPublicProfile(userId) {
       </div>`;
     }
 
+    const badgesHtml = badges.length
+      ? badges.map(b => {
+          const fmtDate = new Date(b.event_datetime).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+          return `<div class="event-badge" style="background:${esc(b.event_color)};" title="${esc(b.badge_label)} — ${fmtDate}">
+            <span class="badge-emoji">${esc(b.badge_emoji)}</span>
+            <span class="badge-text">
+              <span class="badge-name">${esc(b.badge_label)}</span>
+              <span class="badge-date">${fmtDate}</span>
+            </span>
+          </div>`;
+        }).join('')
+      : null;
+
     container.innerHTML = `
       <div style="max-width:560px;">
         <div class="panel" style="text-align:center;margin-bottom:20px;">
@@ -1995,6 +2074,11 @@ async function renderPublicProfile(userId) {
           ${data.bio ? `<p style="color:#C4BDB5;font-size:0.92rem;line-height:1.6;margin-top:10px;">${esc(data.bio)}</p>` : `<p style="color:var(--muted);font-size:0.85rem;font-style:italic;margin-top:10px;">No bio yet.</p>`}
           ${isOwnProfile ? `<button class="btn btn-ghost btn-sm" style="margin-top:18px;" onclick="switchView('account-settings')">Edit My Profile</button>` : ''}
         </div>
+        ${badgesHtml ? `
+        <div class="panel" style="margin-bottom:20px;">
+          <h2 style="margin-bottom:14px;">🏅 Attended Events</h2>
+          <div class="badges-grid">${badgesHtml}</div>
+        </div>` : ''}
         <div class="panel">
           <h2 style="margin-bottom:16px;">💬 What others say about ${esc(name)}</h2>
           <div class="comments-list" style="margin-bottom:16px;">${commentRowsHtml}</div>
@@ -2311,7 +2395,7 @@ async function deleteComment(commentId) {
 
 // ─── CREATE EVENT ─────────────────────────────────────────────────
 function openCreateModal() {
-  ['new-title','new-datetime','new-location','new-maps-url','new-album-url','new-desc','new-rsvp-limit'].forEach(id => document.getElementById(id).value = '');
+  ['new-title','new-datetime','new-location','new-maps-url','new-album-url','new-desc','new-rsvp-limit','new-badge-emoji','new-badge-label'].forEach(id => document.getElementById(id).value = '');
   selectedColor = '#F59E0B';
   document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s.dataset.color === selectedColor));
   document.getElementById('items-builder').innerHTML = '';
@@ -2370,7 +2454,9 @@ async function createNewEvent() {
       album_url: albumUrlRaw || null,
       description: document.getElementById('new-desc').value.trim() || null,
       color: selectedColor,
-      rsvp_limit: rsvpLimit
+      rsvp_limit: rsvpLimit,
+      badge_emoji: document.getElementById('new-badge-emoji').value.trim() || '🎉',
+      badge_label: document.getElementById('new-badge-label').value.trim() || null
     }]).select().single();
     if (evErr) throw evErr;
     if (itemRows.length) {
@@ -2420,6 +2506,8 @@ async function openEditModal(eventId) {
     document.getElementById('edit-location').value = e.location || '';
     document.getElementById('edit-maps-url').value = e.maps_url || '';
     document.getElementById('edit-album-url').value = e.album_url || '';
+    document.getElementById('edit-badge-emoji').value = e.badge_emoji || '🎉';
+    document.getElementById('edit-badge-label').value = e.badge_label || '';
     document.getElementById('edit-desc').value = e.description || '';
     document.getElementById('edit-rsvp-limit').value = e.rsvp_limit != null ? e.rsvp_limit : '';
     document.getElementById('edit-modal-sub').textContent = `Editing: ${e.title}`;
@@ -2497,7 +2585,9 @@ async function saveEditedEvent() {
       album_url: albumUrlRaw || null,
       description: document.getElementById('edit-desc').value.trim() || null,
       color: editSelectedColor,
-      rsvp_limit: rsvpLimit
+      rsvp_limit: rsvpLimit,
+      badge_emoji: document.getElementById('edit-badge-emoji').value.trim() || '🎉',
+      badge_label: document.getElementById('edit-badge-label').value.trim() || null
     }).eq('id', editEventId);
     if (evErr) throw evErr;
 
