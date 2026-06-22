@@ -192,6 +192,21 @@
 
   /* RSVP & ITEMS */
   .rsvp-list { display: flex; flex-direction: column; gap: 10px; }
+
+  /* COMMENTS */
+  .comments-list { display: flex; flex-direction: column; gap: 14px; }
+  .comment-item { display: flex; gap: 10px; }
+  .comment-body-wrap { flex: 1; background: var(--card); border-radius: 10px; padding: 11px 14px; }
+  .comment-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+  .comment-author { font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+  .comment-author:hover { opacity: 0.75; }
+  .comment-timestamp { font-size: 0.72rem; color: var(--muted); }
+  .comment-text { font-size: 0.88rem; color: var(--cream); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+  .comment-delete-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.8rem; padding: 0 4px; line-height: 1; transition: color 0.15s; margin-left: auto; align-self: flex-start; }
+  .comment-delete-btn:hover { color: var(--rose); }
+  .comment-composer { display: flex; gap: 10px; align-items: flex-end; }
+  .comment-composer textarea { flex: 1; resize: none; min-height: 60px; max-height: 160px; border-radius: 10px; font-size: 0.88rem; line-height: 1.5; }
+  .comment-composer textarea:focus { border-color: var(--amber); }
   .rsvp-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border-radius: 8px; font-size: 0.88rem; }
   .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--amber); color: #1C1F2E; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
   .rsvp-item .name { font-weight: 500; flex: 1; }
@@ -356,6 +371,23 @@ create policy "public delete items" on items for delete using (true);
 create policy "public read rsvps" on rsvps for select using (true);
 create policy "public insert rsvps" on rsvps for insert with check (true);
 create policy "users update own rsvps" on rsvps for update using (auth.uid() = user_id);
+
+-- Comments on events
+create table if not exists comments (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid references events(id) on delete cascade,
+  user_id uuid references auth.users(id),
+  body text not null,
+  created_at timestamptz default now()
+);
+alter table comments enable row level security;
+create policy "public read comments" on comments for select using (true);
+create policy "signed in users insert comments" on comments
+  for insert with check (auth.uid() is not null and auth.uid() = user_id);
+create policy "users delete own comments" on comments
+  for delete using (auth.uid() = user_id);
+create policy "public delete comments admin" on comments
+  for delete using (true);
 
 -- Shared admin password (stored as a SHA-256 hash, synced across all browsers)
 create table if not exists settings (
@@ -666,6 +698,13 @@ where datetime is not null;</div>
         <div id="items-list" class="items-list"></div>
         <div id="claim-action" style="margin-top:14px;"></div>
       </div>
+    </div>
+
+    <!-- COMMENTS -->
+    <div class="panel" style="margin-top:20px;">
+      <h2>💬 Comments <span id="comments-count-badge" style="font-size:0.8rem;font-weight:400;color:var(--muted);"></span></h2>
+      <div id="comments-list"></div>
+      <div id="comment-composer" style="margin-top:16px;"></div>
     </div>
   </div>
 </main>
@@ -1569,26 +1608,34 @@ async function fetchAllEvents() {
 }
 
 async function loadEventDetail(id) {
-  const [evRes, itemRes, rsvpRes] = await Promise.all([
+  const [evRes, itemRes, rsvpRes, commentRes] = await Promise.all([
     sb.from('events').select('*').eq('id', id).single(),
     sb.from('items').select('*').eq('event_id', id).order('sort_order'),
-    sb.from('rsvps').select('*').eq('event_id', id).order('created_at')
+    sb.from('rsvps').select('*').eq('event_id', id).order('created_at'),
+    sb.from('comments').select('*').eq('event_id', id).order('created_at')
   ]);
   if (evRes.error) throw evRes.error;
   const rsvps = rsvpRes.data || [];
+  const comments = commentRes.data || [];
 
-  // Batch-fetch avatar colors for everyone in the RSVP list, so the list
-  // can show each person's own chosen color instead of a flat default.
+  // Batch-fetch avatar colors and names for RSVP list + comment authors.
   let avatarColors = {};
-  const userIds = [...new Set(rsvps.map(r => r.user_id).filter(Boolean))];
-  if (userIds.length) {
+  let profileNames = {};
+  const allUserIds = [...new Set([
+    ...rsvps.map(r => r.user_id),
+    ...comments.map(c => c.user_id)
+  ].filter(Boolean))];
+  if (allUserIds.length) {
     try {
-      const { data: profiles } = await sb.from('public_profiles').select('user_id, avatar_color').in('user_id', userIds);
-      (profiles || []).forEach(p => { avatarColors[p.user_id] = p.avatar_color || '#F59E0B'; });
-    } catch(e) { /* non-fatal — falls back to default color below */ }
+      const { data: profiles } = await sb.from('public_profiles').select('user_id, avatar_color, name').in('user_id', allUserIds);
+      (profiles || []).forEach(p => {
+        avatarColors[p.user_id] = p.avatar_color || '#F59E0B';
+        profileNames[p.user_id] = p.name || '';
+      });
+    } catch(e) { /* non-fatal — falls back to defaults */ }
   }
 
-  currentEventData = { event: evRes.data, items: itemRes.data || [], rsvps, avatarColors };
+  currentEventData = { event: evRes.data, items: itemRes.data || [], rsvps, comments, avatarColors, profileNames };
 }
 
 // ─── RENDER HOST DASHBOARD ────────────────────────────────────────
@@ -2026,8 +2073,6 @@ function renderDetail() {
       `<div class="past-event-notice">🕒 This event has already happened — sign-ups are closed.</div>`;
   } else {
     const myExistingRsvp = currentUser ? rsvps.find(r => r.user_id === currentUser.id) : null;
-    // Someone already RSVP'd "yes" can still open the form to change their answer
-    // even if the event is full — the limit only blocks *new* yes RSVPs.
     if (limitReached && !(myExistingRsvp && myExistingRsvp.status === 'yes')) {
       document.getElementById('rsvp-action').innerHTML =
         `<div class="past-event-notice">🚫 This event has reached its RSVP limit (${e.rsvp_limit}).</div>`;
@@ -2037,6 +2082,103 @@ function renderDetail() {
     }
     document.getElementById('claim-action').innerHTML =
       `<button class="btn btn-ghost" style="width:100%;" onclick="requireUser(openClaimModal, 'Sign in to claim an item to bring.')">Claim an item</button>`;
+  }
+
+  renderComments();
+}
+
+// ─── COMMENTS ─────────────────────────────────────────────────────
+function renderComments() {
+  const { comments = [], avatarColors = {}, profileNames = {} } = currentEventData;
+  const isAdmin = isAdminLoggedIn();
+
+  document.getElementById('comments-count-badge').textContent = comments.length ? `(${comments.length})` : '';
+
+  const listEl = document.getElementById('comments-list');
+  listEl.className = 'comments-list';
+
+  if (!comments.length) {
+    listEl.innerHTML = `<p style="color:var(--muted);font-size:0.85rem;">No comments yet — be the first!</p>`;
+  } else {
+    listEl.innerHTML = comments.map(c => {
+      const color = avatarColors[c.user_id] || '#F59E0B';
+      const name = profileNames[c.user_id] || 'Someone';
+      const initial = name[0].toUpperCase();
+      const ts = new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+      const canDelete = isAdmin || (currentUser && currentUser.id === c.user_id);
+      return `<div class="comment-item">
+        <div class="avatar" style="background:${esc(color)};flex-shrink:0;align-self:flex-start;">${esc(initial)}</div>
+        <div class="comment-body-wrap">
+          <div class="comment-header">
+            <span class="comment-author" onclick="showProfile('${c.user_id}','detail')">${esc(name)}</span>
+            <span class="comment-timestamp">${ts}</span>
+            ${canDelete ? `<button class="comment-delete-btn" title="Delete comment" onclick="deleteComment('${c.id}')">🗑</button>` : ''}
+          </div>
+          <div class="comment-text">${esc(c.body)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Composer — only for signed-in users
+  const composerEl = document.getElementById('comment-composer');
+  if (currentUser) {
+    const myColor = userAvatarColor();
+    const myInitial = userInitial();
+    composerEl.innerHTML = `
+      <div class="comment-composer">
+        <div class="avatar" style="background:${esc(myColor)};flex-shrink:0;align-self:flex-end;">${esc(myInitial)}</div>
+        <textarea id="comment-input" placeholder="Write a comment…" rows="2" maxlength="1000" onkeydown="handleCommentKey(event)"></textarea>
+        <button class="btn btn-primary btn-sm" id="comment-submit-btn" onclick="submitComment()" style="flex-shrink:0;">Post</button>
+      </div>`;
+  } else {
+    composerEl.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="requireUser(()=>renderComments(), 'Sign in to leave a comment.')">Sign in to comment</button>`;
+  }
+}
+
+async function submitComment() {
+  const input = document.getElementById('comment-input');
+  const body = input.value.trim();
+  if (!body) return;
+  if (!currentUser) { requireUser(() => renderComments(), 'Sign in to leave a comment.'); return; }
+
+  setBtnLoading('comment-submit-btn', true);
+  try {
+    const { error } = await sb.from('comments').insert({
+      event_id: currentEventId,
+      user_id: currentUser.id,
+      body
+    });
+    if (error) throw error;
+    await loadEventDetail(currentEventId);
+    renderDetail();
+    // Scroll back to comment section
+    document.getElementById('comments-list').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch(e) {
+    showToast('Error posting comment: ' + e.message, true);
+    setBtnLoading('comment-submit-btn', false);
+  }
+}
+
+function handleCommentKey(ev) {
+  // Ctrl/Cmd+Enter submits; plain Enter adds a newline (natural textarea behavior)
+  if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+    ev.preventDefault();
+    submitComment();
+  }
+}
+
+async function deleteComment(commentId) {
+  if (!currentUser && !isAdminLoggedIn()) return;
+  if (!confirm('Delete this comment?')) return;
+  try {
+    const { error } = await sb.from('comments').delete().eq('id', commentId);
+    if (error) throw error;
+    await loadEventDetail(currentEventId);
+    renderDetail();
+    showToast('Comment deleted.');
+  } catch(e) {
+    showToast('Error deleting comment: ' + e.message, true);
   }
 }
 
