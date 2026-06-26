@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&amp;family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,600&amp;family=Figtree:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    .gb-screen::-webkit-scrollbar { display:none; }
+  </style>
+</helmet>
+
+<!-- ===================== SCREEN 1 — HOME FEED ===================== -->
+<div style="position:absolute; left:0; top:0; width:402px;">
+  <div data-drags-parent="1" style="margin-bottom:14px; font-family:'Figtree',sans-serif; cursor:grab;">
+    <span style="font-size:12px; font-weight:700; letter-spacing:0.14em; color:#8a6a55; text-transform:uppercase;">Home feed</span>
+  </div>
+
+  <div style="width:402px; height:840px; background:#0f0a06; border-radius:48px; padding:11px; box-shadow:0 30px 70px -30px rgba(58,36,24,0.6);">
+    <div class="gb-screen" style="position:relative; width:100%; height:100%; background:#FFF7EE; border-radius:38px; overflow:hidden; font-family:'Nunito',sans-serif; color:#3A2418;">
+
+      <!-- status bar -->
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 28px 0; font-family:'Figtree',sans-serif; font-weight:700; font-size:14px; color:#5a2a16;">
+        <span>9:41</span>
+        <div style="display:flex; gap:5px; align-items:center;">
+          <div style="width:16px; height:9px; border:1.5px solid #5a2a16; border-radius:2px;"></div>
+          <div style="width:10px; height:10px; border-radius:50%; background:#5a2a16;"></div>
+        </div>
+      </div>
+
+      <!-- header -->
+      <div style="padding:16px 24px 8px; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          
+          <div style="font-family:'Fredoka',sans-serif; font-weight:600; font-size:28px; color:#5a2a16; line-height:1.1;">Galabanting</div>
+        </div>
+        <div style="width:46px; height:46px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#FFB24A,#FF6B4A); display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Fredoka',sans-serif; font-weight:600; font-size:18px;">M</div>
+      </div>
+
+      <!-- filter chips -->
+      <div style="display:flex; gap:9px; padding:8px 24px 16px; overflow:hidden;">
+        <span style="flex:none; font-family:'Figtree',sans-serif; font-size:13px; font-weight:600; color:#fff; background:#FF6B4A; padding:8px 16px; border-radius:999px;">All</span>
+        <span style="flex:none; font-family:'Figtree',sans-serif; font-size:13px; font-weight:600; color:#a9512f; background:#FFE7C9; padding:8px 16px; border-radius:999px;">Karaoke</span>
+        <span style="flex:none; font-family:'Figtree',sans-serif; font-size:13px; font-weight:600; color:#0d7a6f; background:#d4f0ec; padding:8px 16px; border-radius:999px;">Beach day</span>
+        <span style="flex:none; font-family:'Figtree',sans-serif; font-size:13px; font-weight:600; color:#b03468; background:#ffe0ea; padding:8px 16px; border-radius:999px;">Birthday</span>
+      </div>
+
+      <!-- spotlight card -->
+      <div style="padding:0 24px;">
+        <div style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#c0997f; margin-bottom:12px;">Happening this week</div>
+        <div style="background:#fff; border-radius:22px; box-shadow:0 1px 2px rgba(58,36,24,0.08), 0 16px 34px -22px rgba(58,36,24,0.4); overflow:hidden; margin-bottom:16px;">
+          <div style="height:150px; background-image:repeating-linear-gradient(135deg,#FFD7B0 0px,#FFD7B0 11px,#FFC9A0 11px,#FFC9A0 22px); position:relative; display:flex; align-items:center; justify-content:center;">
+            <span style="font-family:monospace; font-size:10px; letter-spacing:0.05em; color:#a9512f; background:rgba(255,247,238,0.85); padding:5px 9px; border-radius:7px;">[ cover photo ]</span>
+            <span style="position:absolute; top:14px; left:14px; font-family:'Fredoka',sans-serif; font-weight:500; font-size:12px; color:#fff; background:#FF6B4A; padding:6px 12px; border-radius:999px;">Fri · 8:00 PM</span>
+          </div>
+          <div style="padding:16px 18px 18px;">
+            <div style="font-family:'Fredoka',sans-serif; font-weight:600; font-size:20px; color:#3A2418; line-height:1.15;">Sunset rooftop &amp; karaoke</div>
+            <div style="font-size:13px; color:#9a7c69; margin-top:3px;">Hosted by Mara · Poblacion, Makati</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:16px;">
+              <div style="display:flex; align-items:center;">
+                <div style="display:flex;">
+                  <div style="width:28px; height:28px; border-radius:50%; background:#FF6B4A; border:2px solid #fff; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Figtree',sans-serif; font-weight:700; font-size:11px;">M</div>
+                  <div style="width:28px; height:28px; border-radius:50%; background:#FFA62B; border:2px solid #fff; margin-left:-9px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Figtree',sans-serif; font-weight:700; font-size:11px;">J</div>
+                  <div style="width:28px; height:28px; border-radius:50%; background:#1FA89B; border:2px solid #fff; margin-left:-9px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Figtree',sans-serif; font-weight:700; font-size:11px;">R</div>
+                </div>
+                <span style="font-weight:700; font-size:13px; color:#6b4733; margin-left:9px;">+9 going</span>
+              </div>
+              <button style="border:none; cursor:pointer; font-family:'Fredoka',sans-serif; font-weight:500; font-size:14px; color:#fff; background:#FF6B4A; padding:9px 18px; border-radius:999px;">RSVP</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- compact list item -->
+        <div style="display:flex; gap:14px; align-items:center; background:#fff; border-radius:18px; padding:12px; box-shadow:0 1px 2px rgba(58,36,24,0.06); margin-bottom:12px;">
+          <div style="width:64px; height:64px; flex:none; border-radius:14px; background-image:repeating-linear-gradient(135deg,#d4f0ec 0px,#d4f0ec 8px,#c4e9e3 8px,#c4e9e3 16px);"></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-family:'Fredoka',sans-serif; font-weight:500; font-size:16px; color:#3A2418;">Beach day in La Union</div>
+            <div style="font-size:12px; color:#9a7c69;">Sun · 6:00 AM · 14 going</div>
+          </div>
+          <span style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; color:#0d7a6f; background:#d4f0ec; padding:7px 12px; border-radius:999px;">Going</span>
+        </div>
+        <div style="display:flex; gap:14px; align-items:center; background:#fff; border-radius:18px; padding:12px; box-shadow:0 1px 2px rgba(58,36,24,0.06);">
+          <div style="width:64px; height:64px; flex:none; border-radius:14px; background-image:repeating-linear-gradient(135deg,#ffe0ea 0px,#ffe0ea 8px,#ffd2e0 8px,#ffd2e0 16px);"></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-family:'Fredoka',sans-serif; font-weight:500; font-size:16px; color:#3A2418;">Tin's surprise birthday</div>
+            <div style="font-size:12px; color:#9a7c69;">Sat · 7:30 PM · 22 going</div>
+          </div>
+          <span style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; color:#a9512f; background:#FFE7C9; padding:7px 12px; border-radius:999px;">RSVP</span>
+        </div>
+      </div>
+
+      <!-- bottom nav -->
+      <div style="position:absolute; bottom:0; left:0; right:0; height:84px; background:rgba(255,247,238,0.92); backdrop-filter:blur(10px); border-top:1px solid #f0ddca; display:flex; align-items:flex-start; justify-content:space-around; padding:12px 18px 0;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+          <div style="width:22px; height:22px; border-radius:7px; background:#FF6B4A;"></div>
+          <span style="font-family:'Figtree',sans-serif; font-size:10px; font-weight:700; color:#FF6B4A;">Feed</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+          <div style="width:18px; height:18px; border-radius:50%; border:2.5px solid #c0997f; position:relative; margin-top:1px;"><div style="position:absolute; width:7px; height:2.5px; background:#c0997f; border-radius:2px; bottom:-3px; right:-4px; transform:rotate(45deg);"></div></div>
+          <span style="font-family:'Figtree',sans-serif; font-size:10px; font-weight:600; color:#c0997f;">Explore</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:5px; margin-top:-6px;">
+          <div style="width:46px; height:46px; border-radius:50%; background:#FF6B4A; box-shadow:0 8px 18px -6px rgba(255,107,74,0.7); display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Fredoka',sans-serif; font-weight:400; font-size:30px; line-height:1;">+</div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+          <div style="display:flex; margin-top:2px;"><div style="width:13px; height:13px; border-radius:50%; border:2.5px solid #c0997f;"></div><div style="width:13px; height:13px; border-radius:50%; border:2.5px solid #c0997f; margin-left:-5px;"></div></div>
+          <span style="font-family:'Figtree',sans-serif; font-size:10px; font-weight:600; color:#c0997f;">Invites</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+          <div style="width:11px; height:11px; border-radius:50%; background:#c0997f; margin-top:1px;"></div>
+          <div style="width:20px; height:9px; border-radius:9px 9px 0 0; background:#c0997f; margin-top:-1px;"></div>
+          <span style="font-family:'Figtree',sans-serif; font-size:10px; font-weight:600; color:#c0997f; margin-top:-4px;">Me</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN 2 — EVENT PAGE ===================== -->
+<div style="position:absolute; left:470px; top:0; width:402px;">
+  <div data-drags-parent="1" style="margin-bottom:14px; font-family:'Figtree',sans-serif; cursor:grab;">
+    <span style="font-size:12px; font-weight:700; letter-spacing:0.14em; color:#8a6a55; text-transform:uppercase;">Event page · RSVP</span>
+  </div>
+
+  <div style="width:402px; height:840px; background:#0f0a06; border-radius:48px; padding:11px; box-shadow:0 30px 70px -30px rgba(58,36,24,0.6);">
+    <div class="gb-screen" style="position:relative; width:100%; height:100%; background:#FFF7EE; border-radius:38px; overflow:hidden; font-family:'Nunito',sans-serif; color:#3A2418;">
+
+      <!-- cover -->
+      <div style="height:300px; background-image:repeating-linear-gradient(135deg,#FFD7B0 0px,#FFD7B0 13px,#FFC9A0 13px,#FFC9A0 26px); position:relative;">
+        <div style="position:absolute; inset:0; background:linear-gradient(180deg,rgba(90,42,22,0.18) 0%,rgba(90,42,22,0) 30%,rgba(90,42,22,0.55) 100%);"></div>
+        <div style="position:absolute; top:0; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:14px 22px 0; font-family:'Figtree',sans-serif; font-weight:700; font-size:14px; color:#fff;">
+          <span>9:41</span>
+          <div style="display:flex; gap:5px; align-items:center;"><div style="width:16px; height:9px; border:1.5px solid #fff; border-radius:2px;"></div><div style="width:10px; height:10px; border-radius:50%; background:#fff;"></div></div>
+        </div>
+        <div style="position:absolute; top:52px; left:18px; width:38px; height:38px; border-radius:50%; background:rgba(255,247,238,0.9); display:flex; align-items:center; justify-content:center; color:#5a2a16; font-family:'Fredoka',sans-serif; font-size:20px;">‹</div>
+        <div style="position:absolute; top:52px; right:18px; width:38px; height:38px; border-radius:50%; background:rgba(255,247,238,0.9); display:flex; align-items:center; justify-content:center;"><div style="width:14px; height:14px;"><div style="width:14px; height:3px; background:#5a2a16; border-radius:2px;"></div><div style="width:14px; height:3px; background:#5a2a16; border-radius:2px; margin-top:3px;"></div><div style="width:14px; height:3px; background:#5a2a16; border-radius:2px; margin-top:3px;"></div></div></div>
+        <span style="position:absolute; bottom:108px; left:22px; font-family:monospace; font-size:10px; color:#a9512f; background:rgba(255,247,238,0.85); padding:5px 9px; border-radius:7px;">[ cover photo ]</span>
+        <div style="position:absolute; bottom:22px; left:22px; right:22px;">
+          <span style="font-family:'Fredoka',sans-serif; font-weight:500; font-size:12px; color:#5a2a16; background:#FFC247; padding:6px 12px; border-radius:999px;">Fri, Jun 27 · 8:00 PM</span>
+          <div style="font-family:'Fredoka',sans-serif; font-weight:600; font-size:30px; color:#fff; line-height:1.1; margin-top:10px; text-shadow:0 2px 12px rgba(90,42,22,0.5);">Sunset rooftop &amp; karaoke</div>
+        </div>
+      </div>
+
+      <!-- body -->
+      <div style="padding:20px 24px 120px;">
+        <!-- host + location -->
+        <div style="display:flex; align-items:center; gap:11px; margin-bottom:18px;">
+          <div style="width:42px; height:42px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#FFB24A,#FF6B4A); display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Fredoka',sans-serif; font-weight:600; font-size:16px;">M</div>
+          <div style="flex:1;">
+            <div style="font-weight:800; font-size:15px; color:#3A2418;">Hosted by Mara Reyes</div>
+            <div style="font-size:13px; color:#9a7c69;">Poblacion, Makati · 2.4 km away</div>
+          </div>
+          <span style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; color:#a9512f; background:#FFE7C9; padding:8px 14px; border-radius:999px;">Message</span>
+        </div>
+
+        <!-- going -->
+        <div style="background:#fff; border-radius:18px; padding:16px; box-shadow:0 1px 2px rgba(58,36,24,0.06); margin-bottom:18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center;">
+              <div style="display:flex;">
+                <div style="width:34px; height:34px; border-radius:50%; background:#FF6B4A; border:2.5px solid #fff; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Figtree',sans-serif; font-weight:700; font-size:12px;">M</div>
+                <div style="width:34px; height:34px; border-radius:50%; background:#FFA62B; border:2.5px solid #fff; margin-left:-11px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Figtree',sans-serif; font-weight:700; font-size:12px;">J</div>
+                <div style="width:34px; height:34px; border-radius:50%; background:#1FA89B; border:2.5px solid #fff; margin-left:-11px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Figtree',sans-serif; font-weight:700; font-size:12px;">R</div>
+                <div style="width:34px; height:34px; border-radius:50%; background:#FF5C8A; border:2.5px solid #fff; margin-left:-11px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Figtree',sans-serif; font-weight:700; font-size:12px;">+</div>
+              </div>
+              <span style="font-weight:700; font-size:14px; color:#6b4733; margin-left:11px;">12 going</span>
+            </div>
+            <span style="font-size:13px; color:#9a7c69;">3 maybe</span>
+          </div>
+        </div>
+
+        <!-- about -->
+        <div style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#c0997f; margin-bottom:10px;">What's the plan</div>
+        <p style="margin:0 0 18px; font-size:15px; line-height:1.6; color:#6b4733;">Golden hour on the rooftop, then we take over the karaoke room till they kick us out. Bring a song and someone who can actually sing. Drinks and pulutan on the house. 🌇</p>
+
+        <!-- details rows -->
+        <div style="display:flex; gap:12px;">
+          <div style="flex:1; background:#fff; border-radius:16px; padding:14px; box-shadow:0 1px 2px rgba(58,36,24,0.06);">
+            <div style="font-family:'Figtree',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#c0997f;">When</div>
+            <div style="font-family:'Fredoka',sans-serif; font-weight:500; font-size:16px; color:#3A2418; margin-top:3px;">Fri, 8:00 PM</div>
+          </div>
+          <div style="flex:1; background:#fff; border-radius:16px; padding:14px; box-shadow:0 1px 2px rgba(58,36,24,0.06);">
+            <div style="font-family:'Figtree',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#c0997f;">Where</div>
+            <div style="font-family:'Fredoka',sans-serif; font-weight:500; font-size:16px; color:#3A2418; margin-top:3px;">Skydeck, Poblacion</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- sticky RSVP bar -->
+      <div style="position:absolute; bottom:0; left:0; right:0; padding:14px 22px 24px; background:linear-gradient(180deg,rgba(255,247,238,0) 0%,#FFF7EE 22%); display:flex; gap:10px; align-items:center;">
+        <button style="flex:1; border:none; cursor:pointer; font-family:'Fredoka',sans-serif; font-weight:500; font-size:17px; color:#fff; background:#FF6B4A; padding:16px; border-radius:999px; box-shadow:0 10px 22px -8px rgba(255,107,74,0.7);">I'm in →</button>
+        <button style="cursor:pointer; font-family:'Fredoka',sans-serif; font-weight:500; font-size:16px; color:#5a2a16; background:#fff; border:2px solid #f0d9c2; padding:14px 22px; border-radius:999px;">Maybe</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN 3 — HOST FLOW ===================== -->
+<div style="position:absolute; left:940px; top:0; width:402px;">
+  <div data-drags-parent="1" style="margin-bottom:14px; font-family:'Figtree',sans-serif; cursor:grab;">
+    <span style="font-size:12px; font-weight:700; letter-spacing:0.14em; color:#8a6a55; text-transform:uppercase;">Host an event</span>
+  </div>
+
+  <div style="width:402px; height:840px; background:#0f0a06; border-radius:48px; padding:11px; box-shadow:0 30px 70px -30px rgba(58,36,24,0.6);">
+    <div class="gb-screen" style="position:relative; width:100%; height:100%; background:#FFF7EE; border-radius:38px; overflow:hidden; font-family:'Nunito',sans-serif; color:#3A2418;">
+
+      <!-- status + header -->
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 28px 0; font-family:'Figtree',sans-serif; font-weight:700; font-size:14px; color:#5a2a16;">
+        <span>9:41</span>
+        <div style="display:flex; gap:5px; align-items:center;"><div style="width:16px; height:9px; border:1.5px solid #5a2a16; border-radius:2px;"></div><div style="width:10px; height:10px; border-radius:50%; background:#5a2a16;"></div></div>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 22px 6px;">
+        <div style="width:38px; height:38px; border-radius:50%; background:#fff; border:1px solid #f0ddca; display:flex; align-items:center; justify-content:center; color:#5a2a16; font-family:'Fredoka',sans-serif; font-size:22px;">✕</div>
+        <div style="font-family:'Fredoka',sans-serif; font-weight:600; font-size:18px; color:#5a2a16;">New event</div>
+        <span style="font-family:'Figtree',sans-serif; font-size:13px; font-weight:700; color:#c0997f;">Draft</span>
+      </div>
+
+      <!-- form -->
+      <div style="padding:8px 22px 110px;">
+        <!-- cover upload -->
+        <div style="height:130px; border-radius:18px; background-image:repeating-linear-gradient(135deg,#FFE7C9 0px,#FFE7C9 11px,#FFDDB8 11px,#FFDDB8 22px); border:2px dashed #e8b894; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; margin-bottom:20px;">
+          <div style="width:40px; height:40px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; color:#FF6B4A; font-family:'Fredoka',sans-serif; font-size:26px; line-height:1;">+</div>
+          <span style="font-family:'Figtree',sans-serif; font-size:13px; font-weight:600; color:#a9512f;">Add a cover photo</span>
+        </div>
+
+        <!-- event name -->
+        <div style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#c0997f; margin-bottom:8px;">Event name</div>
+        <div style="background:#fff; border-radius:14px; border:1px solid #f0ddca; padding:15px 16px; margin-bottom:18px; font-family:'Fredoka',sans-serif; font-weight:500; font-size:18px; color:#3A2418;">Sunset rooftop &amp; karaoke<span style="display:inline-block; width:2px; height:20px; background:#FF6B4A; vertical-align:-3px; margin-left:2px;"></span></div>
+
+        <!-- date / time row -->
+        <div style="display:flex; gap:12px; margin-bottom:18px;">
+          <div style="flex:1;">
+            <div style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#c0997f; margin-bottom:8px;">Date</div>
+            <div style="background:#fff; border-radius:14px; border:1px solid #f0ddca; padding:14px 15px; font-family:'Nunito',sans-serif; font-weight:700; font-size:15px; color:#3A2418;">Fri, Jun 27</div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#c0997f; margin-bottom:8px;">Time</div>
+            <div style="background:#fff; border-radius:14px; border:1px solid #f0ddca; padding:14px 15px; font-family:'Nunito',sans-serif; font-weight:700; font-size:15px; color:#3A2418;">8:00 PM</div>
+          </div>
+        </div>
+
+        <!-- location -->
+        <div style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#c0997f; margin-bottom:8px;">Location</div>
+        <div style="display:flex; align-items:center; gap:10px; background:#fff; border-radius:14px; border:1px solid #f0ddca; padding:14px 15px; margin-bottom:18px;">
+          <div style="width:9px; height:9px; border-radius:50%; background:#FF6B4A; flex:none;"></div>
+          <span style="font-family:'Nunito',sans-serif; font-weight:700; font-size:15px; color:#3A2418;">Skydeck, Poblacion, Makati</span>
+        </div>
+
+        <!-- vibe tags -->
+        <div style="font-family:'Figtree',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#c0997f; margin-bottom:10px;">Vibe</div>
+        <div style="display:flex; flex-wrap:wrap; gap:9px;">
+          <span style="font-family:'Figtree',sans-serif; font-size:13px; font-weight:600; color:#fff; background:#FF6B4A; padding:8px 16px; border-radius:999px;">Karaoke ✓</span>
+          <span style="font-family:'Figtree',sans-serif; font-size:13px; font-weight:600; color:#a9512f; background:#fff; border:1px solid #f0ddca; padding:8px 16px; border-radius:999px;">Drinks</span>
+          <span style="font-family:'Figtree',sans-serif; font-size:13px; font-weight:600; color:#a9512f; background:#fff; border:1px solid #f0ddca; padding:8px 16px; border-radius:999px;">Rooftop</span>
+          <span style="font-family:'Figtree',sans-serif; font-size:13px; font-weight:600; color:#a9512f; background:#fff; border:1px solid #f0ddca; padding:8px 16px; border-radius:999px;">Chill</span>
+        </div>
+      </div>
+
+      <!-- sticky CTA -->
+      <div style="position:absolute; bottom:0; left:0; right:0; padding:14px 22px 24px; background:linear-gradient(180deg,rgba(255,247,238,0) 0%,#FFF7EE 22%);">
+        <button style="width:100%; border:none; cursor:pointer; font-family:'Fredoka',sans-serif; font-weight:500; font-size:17px; color:#fff; background:#FF6B4A; padding:16px; border-radius:999px; box-shadow:0 10px 22px -8px rgba(255,107,74,0.7);">Send invites to your crew</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>
