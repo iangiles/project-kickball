@@ -331,6 +331,11 @@
   .detail-back:hover { color: var(--cream); gap: 9px; }
   .detail-hero { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px; margin-bottom: 24px; position: relative; overflow: hidden; box-shadow: var(--shadow-sm); }
   .detail-hero::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; background: var(--accent, var(--amber)); }
+  .detail-hero.has-cover::before { display: none; }
+  .detail-cover { display: none; margin: -36px -36px 24px; }
+  .detail-cover.show { display: block; }
+  .detail-cover img { width: 100%; height: 260px; object-fit: cover; display: block; }
+  @media (max-width: 640px) { .detail-cover img { height: 170px; } }
   .detail-hero h1 { font-family: var(--font-display); font-size: clamp(1.7rem, 1.2rem + 2.2vw, 2.6rem); font-weight: 600; margin-bottom: 12px; line-height: 1.1; letter-spacing: -0.5px; }
   .detail-meta { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; }
   .detail-meta-item { display: flex; align-items: center; gap: 7px; font-size: 0.9rem; color: var(--muted); }
@@ -418,6 +423,10 @@
   .form-group input, .form-group textarea, .form-group select { width: 100%; background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 11px 15px; color: var(--cream); font-family: inherit; font-size: 0.9rem; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 18%, transparent); }
   .form-group textarea { resize: vertical; min-height: 80px; }
+  .cover-preview { display: none; margin-top: 10px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+  .cover-preview.show { display: block; }
+  .cover-preview img { width: 100%; height: 160px; object-fit: cover; display: block; }
+  .cover-preview .cover-preview-error { font-size: 0.78rem; color: var(--rose); padding: 12px 14px; }
   .items-builder { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
   .new-items-builder { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
   .item-builder-row { display: flex; gap: 8px; align-items: center; }
@@ -719,10 +728,14 @@ create policy "users update own rsvps" on rsvps
       and events.rsvp_limit is not null
       and events.rsvp_limit <= public.yes_rsvp_count(rsvps.event_id, rsvps.id)
     )
-  );</div>
+  );
+
+-- Cover photo: a pasted image URL shown on event cards and the event page
+-- (no file upload/storage needed — same lightweight pattern as the Maps/Album links).
+alter table events add column if not exists cover_image_url text;</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
-    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ This block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, and enforces an optional RSVP cap — all at the database level, using a true UTC comparison.</p>
+    <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ This block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, a cover photo URL field, and enforces an optional RSVP cap — all at the database level, using a true UTC comparison.</p>
 
     <div class="setup-sql" id="public-profiles-sql" style="margin-top:16px;">-- Public profiles: a publicly-readable table mirroring each user's display
 -- name, bio, and avatar color, since auth.users itself isn't queryable by
@@ -919,6 +932,7 @@ where datetime is not null;</div>
   <div id="view-detail" class="view">
     <button class="detail-back" onclick="backToList()">← Back</button>
     <div class="detail-hero" id="detail-hero">
+      <div class="detail-cover" id="detail-cover"></div>
       <h1 id="detail-title"></h1>
       <div class="detail-meta" id="detail-meta"></div>
       <div class="detail-desc" id="detail-desc"></div>
@@ -973,6 +987,12 @@ where datetime is not null;</div>
     <h2>Create an Event</h2>
     <p class="modal-sub">Fill in the details — you can share the link with guests after.</p>
     <div class="form-group"><label>Event Name</label><input type="text" id="new-title" placeholder="Summer Potluck at the Park"></div>
+    <div class="form-group">
+      <label>Cover Photo URL <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="url" id="new-cover-url" placeholder="https://..." oninput="previewCoverImage(this.value, 'new-cover-preview')">
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Paste a link to an image (Imgur, Google Photos, etc.) — shown on the event card and event page.</p>
+      <div class="cover-preview" id="new-cover-preview"></div>
+    </div>
     <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="new-datetime"></div>
     <div class="form-group"><label>Location</label><input type="text" id="new-location" placeholder="Volunteer Park, Seattle"></div>
     <div class="form-group">
@@ -1028,6 +1048,12 @@ where datetime is not null;</div>
     <h2>Edit Event</h2>
     <p class="modal-sub" id="edit-modal-sub">Update the details below.</p>
     <div class="form-group"><label>Event Name</label><input type="text" id="edit-title" placeholder="Summer Potluck at the Park"></div>
+    <div class="form-group">
+      <label>Cover Photo URL <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="url" id="edit-cover-url" placeholder="https://..." oninput="previewCoverImage(this.value, 'edit-cover-preview')">
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Paste a link to an image (Imgur, Google Photos, etc.) — shown on the event card and event page.</p>
+      <div class="cover-preview" id="edit-cover-preview"></div>
+    </div>
     <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="edit-datetime"></div>
     <div class="form-group"><label>Location</label><input type="text" id="edit-location" placeholder="Volunteer Park, Seattle"></div>
     <div class="form-group">
@@ -2491,13 +2517,21 @@ function relativeSoonLabel(dtStr) {
   return 'Coming up';
 }
 
+// Inline background-image when a cover photo URL is set; otherwise the CSS
+// diagonal-stripe placeholder (tinted to the event's color) shows through.
+function coverStyleFragment(e) {
+  return e.cover_image_url
+    ? `background-image:url(${esc(e.cover_image_url)});background-size:cover;background-position:center;`
+    : '';
+}
+
 function eventCardHTML(e, context, mineInfo) {
   const accent = e.color || '#FF6B4A';
   const date = fmtDate(e.datetime, {weekday:'short',month:'short',day:'numeric'});
   const time = fmtTime(e.datetime);
 
   return `<div class="event-card" style="--accent:${accent}" onclick="showDetail('${e.id}','${context==='mine'?'mine':context}')">
-    <div class="event-card-cover" style="--accent:${accent}">
+    <div class="event-card-cover" style="--accent:${accent};${coverStyleFragment(e)}">
       <span class="event-card-label">${context==='host'?'📌 Managed':context==='mine'?'⭐ Yours':'🎟 Open'}</span>
       ${e.datetime ? `<span class="event-card-datepill">${date}${time?' · '+time:''}</span>` : ''}
     </div>
@@ -2523,7 +2557,7 @@ function heroCardHTML(e, context, mineInfo) {
   const fromView = context === 'mine' ? 'mine' : context;
 
   return `<div class="hero-card" style="--accent:${accent}">
-    <div class="hero-card-cover" style="--accent:${accent}" onclick="showDetail('${e.id}','${fromView}')">
+    <div class="hero-card-cover" style="--accent:${accent};${coverStyleFragment(e)}" onclick="showDetail('${e.id}','${fromView}')">
       <span class="event-card-label">${context==='host'?'📌 Managed':context==='mine'?'⭐ Yours':'🎟 Open'}</span>
       ${e.datetime ? `<span class="hero-card-eyebrow">${relativeSoonLabel(e.datetime)}</span>` : ''}
     </div>
@@ -2557,7 +2591,11 @@ function dashboardEventsHTML(upcoming, context, mineInfoFor, moreLabel) {
 function renderDetail() {
   const { event: e, items, rsvps } = currentEventData;
   const hero = document.getElementById('detail-hero');
-  hero.style.setProperty('--accent', e.color || '#F59E0B');
+  hero.style.setProperty('--accent', e.color || '#FF6B4A');
+  hero.classList.toggle('has-cover', !!e.cover_image_url);
+  const coverEl = document.getElementById('detail-cover');
+  coverEl.classList.toggle('show', !!e.cover_image_url);
+  coverEl.innerHTML = e.cover_image_url ? `<img src="${esc(e.cover_image_url)}" alt="">` : '';
   document.getElementById('detail-title').textContent = e.title;
 
   const date = fmtDate(e.datetime, {weekday:'long',month:'long',day:'numeric',year:'numeric'});
@@ -2748,7 +2786,8 @@ async function deleteComment(commentId) {
 
 // ─── CREATE EVENT ─────────────────────────────────────────────────
 function openCreateModal() {
-  ['new-title','new-datetime','new-location','new-maps-url','new-album-url','new-desc','new-rsvp-limit','new-badge-emoji','new-badge-label'].forEach(id => document.getElementById(id).value = '');
+  ['new-title','new-cover-url','new-datetime','new-location','new-maps-url','new-album-url','new-desc','new-rsvp-limit','new-badge-emoji','new-badge-label'].forEach(id => document.getElementById(id).value = '');
+  previewCoverImage('', 'new-cover-preview');
   selectedColor = '#FF6B4A';
   document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s.dataset.color === selectedColor));
   document.getElementById('items-builder').innerHTML = '';
@@ -2777,6 +2816,9 @@ async function createNewEvent() {
   const title = document.getElementById('new-title').value.trim();
   if (!title) { showToast('Please enter an event name.', true); return; }
 
+  const coverUrlRaw = document.getElementById('new-cover-url').value.trim();
+  if (coverUrlRaw && !isValidUrl(coverUrlRaw)) { showToast('Please enter a valid cover photo URL (starting with http:// or https://).', true); return; }
+
   const mapsUrlRaw = document.getElementById('new-maps-url').value.trim();
   if (mapsUrlRaw && !isValidUrl(mapsUrlRaw)) { showToast('Please enter a valid Google Maps URL (starting with http:// or https://).', true); return; }
 
@@ -2803,6 +2845,7 @@ async function createNewEvent() {
       title,
       datetime: localDtInputToUTC(document.getElementById('new-datetime').value),
       location: document.getElementById('new-location').value.trim() || null,
+      cover_image_url: coverUrlRaw || null,
       maps_url: mapsUrlRaw || null,
       album_url: albumUrlRaw || null,
       description: document.getElementById('new-desc').value.trim() || null,
@@ -2855,6 +2898,8 @@ async function openEditModal(eventId) {
 
     // Populate fields
     document.getElementById('edit-title').value = e.title || '';
+    document.getElementById('edit-cover-url').value = e.cover_image_url || '';
+    previewCoverImage(e.cover_image_url || '', 'edit-cover-preview');
     document.getElementById('edit-datetime').value = dtToInputVal(e.datetime);
     document.getElementById('edit-location').value = e.location || '';
     document.getElementById('edit-maps-url').value = e.maps_url || '';
@@ -2908,6 +2953,9 @@ async function saveEditedEvent() {
   const title = document.getElementById('edit-title').value.trim();
   if (!title) { showToast('Please enter an event name.', true); return; }
 
+  const coverUrlRaw = document.getElementById('edit-cover-url').value.trim();
+  if (coverUrlRaw && !isValidUrl(coverUrlRaw)) { showToast('Please enter a valid cover photo URL (starting with http:// or https://).', true); return; }
+
   const mapsUrlRaw = document.getElementById('edit-maps-url').value.trim();
   if (mapsUrlRaw && !isValidUrl(mapsUrlRaw)) { showToast('Please enter a valid Google Maps URL (starting with http:// or https://).', true); return; }
 
@@ -2934,6 +2982,7 @@ async function saveEditedEvent() {
       title,
       datetime: localDtInputToUTC(document.getElementById('edit-datetime').value),
       location: document.getElementById('edit-location').value.trim() || null,
+      cover_image_url: coverUrlRaw || null,
       maps_url: mapsUrlRaw || null,
       album_url: albumUrlRaw || null,
       description: document.getElementById('edit-desc').value.trim() || null,
@@ -3229,6 +3278,19 @@ function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function isValidUrl(str) {
   try { const u = new URL(str); return u.protocol === 'http:' || u.protocol === 'https:'; }
   catch(e) { return false; }
+}
+function previewCoverImage(url, previewId) {
+  const el = document.getElementById(previewId);
+  if (!el) return;
+  url = (url || '').trim();
+  el.innerHTML = '';
+  if (!url) { el.classList.remove('show'); return; }
+  const img = document.createElement('img');
+  img.alt = 'Cover photo preview';
+  img.onerror = () => { el.innerHTML = '<p class="cover-preview-error">Couldn\'t load that image — check the link.</p>'; };
+  img.src = url;
+  el.appendChild(img);
+  el.classList.add('show');
 }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
