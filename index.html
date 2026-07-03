@@ -379,6 +379,16 @@
   .comment-composer textarea { flex: 1; resize: none; min-height: 60px; max-height: 160px; border-radius: 14px; font-size: 0.88rem; line-height: 1.5; }
   .comment-composer textarea:focus { border-color: var(--amber); }
 
+  /* PROFILE PAGE LAYOUT */
+  .profile-page { max-width: 860px; }
+  .profile-layout { display: flex; flex-direction: column; gap: 20px; align-items: stretch; }
+  .profile-main { display: flex; flex-direction: column; gap: 20px; flex: 1; min-width: 0; }
+  .profile-badges-col { flex-shrink: 0; }
+  @media (min-width: 700px) {
+    .profile-layout { flex-direction: row; align-items: flex-start; }
+    .profile-badges-col { width: 260px; }
+  }
+
   /* EVENT BADGES on profiles */
   .badges-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
   .event-badge {
@@ -450,7 +460,7 @@
   .field-container::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0, transparent 48px, rgba(0,0,0,0.08) 48px, rgba(0,0,0,0.08) 96px); pointer-events: none; }
   .field-half { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; position: relative; z-index: 1; }
   .field-half + .field-half { border-left: 2px solid rgba(255,255,255,0.28); }
-  .field-half-label { font-family: var(--font-ui); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .field-half-label { display: inline-flex; align-self: flex-start; font-family: var(--font-ui); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; padding: 4px 10px; border-radius: 99px; background: rgba(0,0,0,0.28); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.18); }
   .field-center-col { display: flex; align-items: center; justify-content: center; padding: 0 4px; position: relative; z-index: 1; }
   .field-center-circle { width: 52px; height: 52px; border: 2px solid rgba(255,255,255,0.28); border-radius: 50%; }
   .field-players { display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start; }
@@ -2689,22 +2699,28 @@ async function renderPublicProfile(userId) {
       : null;
 
     container.innerHTML = `
-      <div style="max-width:560px;">
-        <div class="panel" style="text-align:center;margin-bottom:20px;">
-          <div class="avatar" style="width:64px;height:64px;font-size:1.6rem;background:${esc(color)};margin:0 auto 16px;">${esc(initial)}</div>
-          <h1 style="font-family:'Newsreader',serif;font-size:1.9rem;font-weight:600;margin-bottom:6px;">${esc(name)}</h1>
-          ${data.bio ? `<p style="color:var(--body-text);font-size:0.92rem;line-height:1.6;margin-top:10px;font-family:var(--font-body);">${esc(data.bio)}</p>` : `<p style="color:var(--muted);font-size:0.85rem;font-style:italic;margin-top:10px;font-family:var(--font-body);">No bio yet.</p>`}
-          ${isOwnProfile ? `<button class="btn btn-ghost btn-sm" style="margin-top:18px;" onclick="switchView('account-settings')">Edit My Profile</button>` : ''}
-        </div>
-        ${badgesHtml ? `
-        <div class="panel" style="margin-bottom:20px;">
-          <h2 style="margin-bottom:14px;">🏅 Attended Events</h2>
-          <div class="badges-grid">${badgesHtml}</div>
-        </div>` : ''}
-        <div class="panel">
-          <h2 style="margin-bottom:16px;">💬 What others say about ${esc(name)}</h2>
-          <div class="comments-list" style="margin-bottom:16px;">${commentRowsHtml}</div>
-          <div id="profile-comment-composer">${composerHtml}</div>
+      <div class="profile-page">
+        <div class="profile-layout">
+          <div class="profile-main">
+            <div class="panel" style="text-align:center;">
+              <div class="avatar" style="width:64px;height:64px;font-size:1.6rem;background:${esc(color)};margin:0 auto 16px;">${esc(initial)}</div>
+              <h1 style="font-family:'Newsreader',serif;font-size:1.9rem;font-weight:600;margin-bottom:6px;">${esc(name)}</h1>
+              ${data.bio ? `<p style="color:var(--body-text);font-size:0.92rem;line-height:1.6;margin-top:10px;font-family:var(--font-body);">${esc(data.bio)}</p>` : `<p style="color:var(--muted);font-size:0.85rem;font-style:italic;margin-top:10px;font-family:var(--font-body);">No bio yet.</p>`}
+              ${isOwnProfile ? `<button class="btn btn-ghost btn-sm" style="margin-top:18px;" onclick="switchView('account-settings')">Edit My Profile</button>` : ''}
+            </div>
+            <div class="panel">
+              <h2 style="margin-bottom:16px;">💬 What others say about ${esc(name)}</h2>
+              <div class="comments-list" style="margin-bottom:16px;">${commentRowsHtml}</div>
+              <div id="profile-comment-composer">${composerHtml}</div>
+            </div>
+          </div>
+          ${badgesHtml ? `
+          <div class="profile-badges-col">
+            <div class="panel">
+              <h2 style="margin-bottom:14px;">🏅 Attended Events</h2>
+              <div class="badges-grid">${badgesHtml}</div>
+            </div>
+          </div>` : ''}
         </div>
       </div>`;
   } catch(e) {
