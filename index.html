@@ -311,6 +311,7 @@
   .event-card-body { padding: 18px 20px 20px; }
   .event-card h3 { font-family: var(--font-display); font-size: 1.3rem; font-weight: 600; margin-bottom: 5px; line-height: 1.2; letter-spacing: -0.1px; }
   .event-card-meta { font-family: var(--font-ui); font-size: 0.84rem; color: var(--muted); margin-bottom: 16px; }
+  .event-cat-tag { display: inline-flex; align-self: flex-start; align-items: center; font-family: var(--font-ui); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; padding: 3px 9px; border-radius: 99px; background: color-mix(in srgb, var(--accent, var(--amber)) 16%, var(--card)); color: var(--accent, var(--amber)); margin-bottom: 8px; }
   .items-bar-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
   .items-bar { height: 8px; background: var(--card); border-radius: 99px; overflow: hidden; margin-bottom: 16px; }
   .items-bar-fill { height: 100%; background: var(--sage); border-radius: 99px; transition: width 0.5s cubic-bezier(.22,1,.36,1); }
@@ -340,8 +341,12 @@
   .detail-meta { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; }
   .detail-meta-item { display: flex; align-items: center; gap: 7px; font-size: 0.9rem; color: var(--muted); }
   .detail-meta-item strong { color: var(--cream); font-weight: 600; }
+  .detail-info-blocks { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+  .detail-info-block { background: color-mix(in srgb, var(--accent, var(--amber)) 8%, var(--card)); border-left: 3px solid var(--accent, var(--amber)); border-radius: 0 10px 10px 0; padding: 10px 14px; }
+  .detail-info-label { font-family: var(--font-ui); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent, var(--amber)); margin-bottom: 3px; }
+  .detail-info-value { font-family: var(--font-body); font-size: 0.9rem; color: var(--body-text); line-height: 1.6; white-space: pre-wrap; }
   .detail-desc { font-size: 0.95rem; color: var(--body-text); line-height: 1.75; font-family: var(--font-body); }
-  .detail-share { background: color-mix(in srgb, var(--blue) 12%, transparent); border: 1px solid color-mix(in srgb, var(--blue) 30%, transparent); border-radius: 14px; padding: 14px 18px; margin-top: 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .detail-share { margin-top: 18px; }
   .share-url { font-size: 0.8rem; color: var(--blue); font-family: ui-monospace, monospace; word-break: break-all; }
   .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
   @media(max-width: 640px) { .detail-grid { grid-template-columns: 1fr; } }
@@ -414,6 +419,9 @@
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
   .modal-overlay.open { display: flex; }
   .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 34px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; animation: modalIn 0.28s cubic-bezier(.34,1.4,.5,1); box-shadow: var(--shadow-lg); }
+  .form-page { max-width: 600px; margin: 0 auto; padding: 10px 0 60px; }
+  .form-page-title { font-family: var(--font-display); font-size: clamp(1.6rem, 1.2rem + 1.8vw, 2.2rem); font-weight: 600; margin-bottom: 4px; letter-spacing: -0.3px; }
+  .form-page-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--border); }
   @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
   .modal h2 { font-family: var(--font-display); font-size: 1.7rem; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.3px; }
   .modal-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; line-height: 1.5; font-family: var(--font-body); }
@@ -423,6 +431,44 @@
   .form-group input, .form-group textarea, .form-group select { width: 100%; background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 11px 15px; color: var(--cream); font-family: inherit; font-size: 0.9rem; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 18%, transparent); }
   .form-group textarea { resize: vertical; min-height: 80px; }
+  .category-select-row { display: flex; gap: 8px; align-items: center; }
+  .category-select-row select { flex: 1; margin: 0; }
+  .category-new-row { display: flex; gap: 8px; margin-top: 8px; }
+  .category-new-row input { flex: 1; margin: 0; }
+  /* Team builder in forms */
+  .team-builder-row { display: flex; gap: 8px; align-items: center; }
+  .team-builder-row input { flex: 1; }
+  .team-color-dot { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; flex-shrink: 0; border: 2px solid rgba(0,0,0,0.12); transition: transform 0.15s var(--ease); }
+  .team-color-dot:hover { transform: scale(1.18); }
+  /* Team assignment select in RSVP list */
+  .team-assign-select { font-family: var(--font-ui); font-size: 0.72rem; padding: 3px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--cream); cursor: pointer; max-width: 110px; }
+  /* Team visualization panel */
+  .team-viz-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px; box-shadow: var(--shadow-sm); margin-bottom: 22px; }
+  .team-viz-panel h2 { font-family: var(--font-display); font-size: 1.3rem; font-weight: 600; margin-bottom: 18px; display: flex; align-items: center; gap: 9px; letter-spacing: -0.2px; }
+  /* Field visualization */
+  .field-container { border-radius: 14px; overflow: hidden; background: #2c6e2c; display: flex; min-height: 170px; position: relative; }
+  .field-container::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0, transparent 48px, rgba(0,0,0,0.08) 48px, rgba(0,0,0,0.08) 96px); pointer-events: none; }
+  .field-half { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; position: relative; z-index: 1; }
+  .field-half + .field-half { border-left: 2px solid rgba(255,255,255,0.28); }
+  .field-half-label { font-family: var(--font-ui); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .field-center-col { display: flex; align-items: center; justify-content: center; padding: 0 4px; position: relative; z-index: 1; }
+  .field-center-circle { width: 52px; height: 52px; border: 2px solid rgba(255,255,255,0.28); border-radius: 50%; }
+  .field-players { display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start; }
+  .field-player { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 0.72rem; font-family: var(--font-ui); border: 2px solid rgba(255,255,255,0.45); box-shadow: 0 2px 8px rgba(0,0,0,0.35); cursor: default; flex-shrink: 0; }
+  /* Default column visualization */
+  .team-columns { display: flex; gap: 12px; flex-wrap: wrap; }
+  .team-col { flex: 1; min-width: 130px; background: var(--card); border-radius: 14px; padding: 14px 16px; }
+  .team-col-header { display: flex; align-items: center; gap: 8px; font-family: var(--font-ui); font-weight: 700; font-size: 0.84rem; margin-bottom: 10px; color: var(--cream); }
+  .team-col-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .team-col-count { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 0.78rem; }
+  .team-col-players { display: flex; flex-direction: column; gap: 7px; }
+  .team-col-player { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--cream); font-family: var(--font-ui); }
+  .team-col-avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 0.65rem; font-family: var(--font-ui); flex-shrink: 0; }
+  /* Unassigned players */
+  .team-unassigned { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .team-unassigned-label { font-family: var(--font-ui); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .team-unassigned-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .team-unassigned-pill { display: flex; align-items: center; gap: 6px; background: var(--card); border-radius: 99px; padding: 4px 10px 4px 4px; font-size: 0.78rem; color: var(--cream); font-family: var(--font-ui); }
   .cover-preview { display: none; margin-top: 10px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
   .cover-preview.show { display: block; }
   .cover-preview img { width: 100%; height: 160px; object-fit: cover; display: block; }
@@ -732,7 +778,53 @@ create policy "users update own rsvps" on rsvps
 
 -- Cover photo: a pasted image URL shown on event cards and the event page
 -- (no file upload/storage needed — same lightweight pattern as the Maps/Album links).
-alter table events add column if not exists cover_image_url text;</div>
+alter table events add column if not exists cover_image_url text;
+
+-- Event categories: a shared lookup table so events can be browsed by type.
+-- Public read + insert; category management is gated by the admin password in the UI.
+create table if not exists categories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz default now(),
+  constraint categories_name_unique unique (name)
+);
+alter table categories enable row level security;
+drop policy if exists "public read categories" on categories;
+create policy "public read categories" on categories for select using (true);
+drop policy if exists "public insert categories" on categories;
+create policy "public insert categories" on categories for insert with check (true);
+
+alter table events add column if not exists category_id uuid references categories(id);
+alter table events add column if not exists payment text;
+alter table events add column if not exists what_to_bring text;
+
+-- Event teams: named groups for competitive/split-group events.
+-- Admin-managed in the event editor; RSVPs can be assigned to a team.
+create table if not exists event_teams (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events(id) on delete cascade,
+  name text not null,
+  color text default '#FF6B4A',
+  sort_order integer default 0,
+  created_at timestamptz default now()
+);
+alter table event_teams enable row level security;
+drop policy if exists "public read teams" on event_teams;
+create policy "public read teams" on event_teams for select using (true);
+drop policy if exists "public insert teams" on event_teams;
+create policy "public insert teams" on event_teams for insert with check (true);
+drop policy if exists "public update teams" on event_teams;
+create policy "public update teams" on event_teams for update using (true);
+drop policy if exists "public delete teams" on event_teams;
+create policy "public delete teams" on event_teams for delete using (true);
+
+alter table rsvps add column if not exists team_id uuid references event_teams(id) on delete set null;
+
+insert into categories (name) values
+  ('Birthday'), ('Brunch'), ('Beach day'), ('Dinner'),
+  ('Drinks'), ('Game night'), ('Hiking'), ('Karaoke'),
+  ('Movie night'), ('Potluck')
+on conflict on constraint categories_name_unique do nothing;</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
     <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ This block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, a cover photo URL field, and enforces an optional RSVP cap — all at the database level, using a true UTC comparison.</p>
@@ -810,7 +902,20 @@ as $$
   order by e.datetime desc;
 $$;
 
-grant execute on function public.get_earned_badges(uuid) to anon, authenticated;</div>
+grant execute on function public.get_earned_badges(uuid) to anon, authenticated;
+
+-- Allows admin to assign RSVPs to teams without Supabase Auth role — bypasses
+-- the "users update own rsvps" RLS policy which only permits self-updates.
+create or replace function public.assign_rsvp_team(p_rsvp_id uuid, p_team_id uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update rsvps set team_id = p_team_id where id = p_rsvp_id;
+$$;
+
+grant execute on function public.assign_rsvp_team(uuid, uuid) to anon, authenticated;</div>
     <button class="copy-sql-btn" onclick="copySql('public-profiles-sql')">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Powers public profile pages, viewable by clicking a name on the RSVP list.</p>
 
@@ -935,10 +1040,13 @@ where datetime is not null;</div>
       <div class="detail-cover" id="detail-cover"></div>
       <h1 id="detail-title"></h1>
       <div class="detail-meta" id="detail-meta"></div>
+      <div class="detail-info-blocks" id="detail-info-blocks"></div>
       <div class="detail-desc" id="detail-desc"></div>
+      <div id="detail-album-btn"></div>
       <div class="detail-share" id="detail-share"></div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:20px;" id="detail-actions"></div>
+    <div id="team-viz-section" style="display:none;"></div>
     <div class="detail-grid">
       <div class="panel">
         <h2>🙋 RSVPs <span id="rsvp-count-badge" style="font-size:0.8rem;font-weight:400;color:var(--muted);"></span></h2>
@@ -958,6 +1066,181 @@ where datetime is not null;</div>
       <h2>💬 Comments <span id="comments-count-badge" style="font-size:0.8rem;font-weight:400;color:var(--muted);"></span></h2>
       <div id="comments-list"></div>
       <div id="comment-composer" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- CREATE EVENT PAGE -->
+  <div id="view-create-event" class="view">
+    <div class="form-page">
+      <button class="detail-back" onclick="backFromEventForm()">← Back</button>
+      <h1 class="form-page-title">Create an Event</h1>
+      <p class="modal-sub">Fill in the details — you can share the link with guests after.</p>
+      <div class="form-group"><label>Event Name</label><input type="text" id="new-title" placeholder="Summer Potluck at the Park"></div>
+      <div class="form-group">
+        <label>Category <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <div class="category-select-row">
+          <select id="new-category-select"><option value="">— No category —</option></select>
+          <button type="button" class="btn btn-ghost btn-sm" style="white-space:nowrap;" onclick="toggleNewCategoryRow('new')">+ New</button>
+        </div>
+        <div id="new-category-row" class="category-new-row" style="display:none;">
+          <input type="text" id="new-category-input" placeholder="Category name (e.g. Beach day)">
+          <button type="button" class="btn btn-primary btn-sm" onclick="saveNewCategory('new')">Add</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Cover Photo URL <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="url" id="new-cover-url" placeholder="https://..." oninput="previewCoverImage(this.value, 'new-cover-preview')">
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Paste a link to an image (Imgur, Google Photos, etc.) — shown on the event card and event page.</p>
+        <div class="cover-preview" id="new-cover-preview"></div>
+      </div>
+      <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="new-datetime"></div>
+      <div class="form-group"><label>Location</label><input type="text" id="new-location" placeholder="Volunteer Park, Seattle"></div>
+      <div class="form-group">
+        <label>Google Maps Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="url" id="new-maps-url" placeholder="https://maps.google.com/?q=...">
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">If set, guests can tap the location name to open it in Google Maps.</p>
+      </div>
+      <div class="form-group">
+        <label>Payment <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="text" id="new-payment" placeholder="e.g. Free · $20/person · Venmo @jane">
+      </div>
+      <div class="form-group">
+        <label>What to bring <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <textarea id="new-what-to-bring" placeholder="e.g. Swimsuit, sunscreen, a good attitude" style="min-height:64px;"></textarea>
+      </div>
+      <div class="form-group"><label>Description</label><textarea id="new-desc" placeholder="Tell guests what to expect…"></textarea></div>
+      <div class="form-group">
+        <label>Photo Album Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="url" id="new-album-url" placeholder="https://photos.google.com/... or similar">
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Link to a shared album — shown on the event page after it's created.</p>
+      </div>
+      <div class="form-group">
+        <label>RSVP Limit <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="number" id="new-rsvp-limit" min="1" placeholder="Leave blank for unlimited">
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Caps the number of guests who can RSVP "Yes."</p>
+      </div>
+      <div class="form-group">
+        <label>Color Theme</label>
+        <div class="color-pick" id="color-pick">
+          <div class="color-swatch selected" data-color="#FF6B4A" style="background:#FF6B4A"></div>
+          <div class="color-swatch" data-color="#FFA62B" style="background:#FFA62B"></div>
+          <div class="color-swatch" data-color="#FF5C8A" style="background:#FF5C8A"></div>
+          <div class="color-swatch" data-color="#E8354A" style="background:#E8354A"></div>
+          <div class="color-swatch" data-color="#1FA89B" style="background:#1FA89B"></div>
+          <div class="color-swatch" data-color="#FFC247" style="background:#FFC247"></div>
+          <div class="color-swatch" data-color="#5B68E8" style="background:#5B68E8"></div>
+          <div class="color-swatch" data-color="#5A2A16" style="background:#5A2A16"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Attendance Badge <span style="text-transform:none;font-weight:400;color:var(--muted);">(shown on profiles of guests who attended)</span></label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="new-badge-emoji" placeholder="🎉" style="width:64px;text-align:center;font-size:1.2rem;" maxlength="4">
+          <input type="text" id="new-badge-label" placeholder="Badge label (defaults to event name)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Teams <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional — for competitive or split-group events)</span></label>
+        <div class="items-builder" id="teams-builder"></div>
+        <button class="add-item-btn" onclick="addTeamRow('teams-builder')">+ Add team</button>
+      </div>
+      <div class="form-group">
+        <label>Items Guests Can Bring</label>
+        <div class="items-builder" id="items-builder"></div>
+        <button class="add-item-btn" onclick="addItemRow()">+ Add item</button>
+      </div>
+      <div class="form-page-footer">
+        <button class="btn btn-ghost" onclick="backFromEventForm()">Cancel</button>
+        <button class="btn btn-primary" id="create-event-btn" onclick="createNewEvent()">Create Event</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT EVENT PAGE -->
+  <div id="view-edit-event" class="view">
+    <div class="form-page">
+      <button class="detail-back" onclick="backFromEventForm()">← Back</button>
+      <h1 class="form-page-title" id="edit-form-title">Edit Event</h1>
+      <p class="modal-sub" id="edit-modal-sub">Update the details below.</p>
+      <div class="form-group"><label>Event Name</label><input type="text" id="edit-title" placeholder="Summer Potluck at the Park"></div>
+      <div class="form-group">
+        <label>Category <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <div class="category-select-row">
+          <select id="edit-category-select"><option value="">— No category —</option></select>
+          <button type="button" class="btn btn-ghost btn-sm" style="white-space:nowrap;" onclick="toggleNewCategoryRow('edit')">+ New</button>
+        </div>
+        <div id="edit-category-row" class="category-new-row" style="display:none;">
+          <input type="text" id="edit-category-input" placeholder="Category name (e.g. Beach day)">
+          <button type="button" class="btn btn-primary btn-sm" onclick="saveNewCategory('edit')">Add</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Cover Photo URL <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="url" id="edit-cover-url" placeholder="https://..." oninput="previewCoverImage(this.value, 'edit-cover-preview')">
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Paste a link to an image (Imgur, Google Photos, etc.) — shown on the event card and event page.</p>
+        <div class="cover-preview" id="edit-cover-preview"></div>
+      </div>
+      <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="edit-datetime"></div>
+      <div class="form-group"><label>Location</label><input type="text" id="edit-location" placeholder="Volunteer Park, Seattle"></div>
+      <div class="form-group">
+        <label>Google Maps Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="url" id="edit-maps-url" placeholder="https://maps.google.com/?q=...">
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">If set, guests can tap the location name to open it in Google Maps.</p>
+      </div>
+      <div class="form-group">
+        <label>Payment <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="text" id="edit-payment" placeholder="e.g. Free · $20/person · Venmo @jane">
+      </div>
+      <div class="form-group">
+        <label>What to bring <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <textarea id="edit-what-to-bring" placeholder="e.g. Swimsuit, sunscreen, a good attitude" style="min-height:64px;"></textarea>
+      </div>
+      <div class="form-group"><label>Description</label><textarea id="edit-desc" placeholder="Tell guests what to expect…"></textarea></div>
+      <div class="form-group">
+        <label>Photo Album Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="url" id="edit-album-url" placeholder="https://photos.google.com/... or similar">
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Link to a shared album — shown on the event page after it's created.</p>
+      </div>
+      <div class="form-group">
+        <label>RSVP Limit <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="number" id="edit-rsvp-limit" min="1" placeholder="Leave blank for unlimited">
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Caps the number of guests who can RSVP "Yes."</p>
+      </div>
+      <div class="form-group">
+        <label>Color Theme</label>
+        <div class="color-pick" id="edit-color-pick">
+          <div class="color-swatch selected" data-color="#FF6B4A" style="background:#FF6B4A"></div>
+          <div class="color-swatch" data-color="#FFA62B" style="background:#FFA62B"></div>
+          <div class="color-swatch" data-color="#FF5C8A" style="background:#FF5C8A"></div>
+          <div class="color-swatch" data-color="#E8354A" style="background:#E8354A"></div>
+          <div class="color-swatch" data-color="#1FA89B" style="background:#1FA89B"></div>
+          <div class="color-swatch" data-color="#FFC247" style="background:#FFC247"></div>
+          <div class="color-swatch" data-color="#5B68E8" style="background:#5B68E8"></div>
+          <div class="color-swatch" data-color="#5A2A16" style="background:#5A2A16"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Attendance Badge <span style="text-transform:none;font-weight:400;color:var(--muted);">(shown on profiles of guests who attended)</span></label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="edit-badge-emoji" placeholder="🎉" style="width:64px;text-align:center;font-size:1.2rem;" maxlength="4">
+          <input type="text" id="edit-badge-label" placeholder="Badge label (defaults to event name)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Teams <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional — for competitive or split-group events)</span></label>
+        <div class="items-builder" id="edit-teams-builder"></div>
+        <button class="add-item-btn" onclick="addTeamRow('edit-teams-builder')">+ Add team</button>
+      </div>
+      <div class="form-group">
+        <label>Items Guests Can Bring</label>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">Existing claimed items are shown but can't be removed. Unclaimed items can be deleted or renamed.</p>
+        <div class="items-builder" id="edit-items-builder"></div>
+        <button class="add-item-btn" onclick="addEditItemRow()">+ Add item</button>
+      </div>
+      <div class="form-page-footer">
+        <button class="btn btn-ghost" onclick="backFromEventForm()">Cancel</button>
+        <button class="btn btn-primary" id="edit-event-btn" onclick="saveEditedEvent()">Save Changes</button>
+      </div>
     </div>
   </div>
 </main>
@@ -981,128 +1264,6 @@ where datetime is not null;</div>
   </button>
 </div>
 
-<!-- CREATE EVENT MODAL -->
-<div class="modal-overlay" id="modal-create">
-  <div class="modal">
-    <h2>Create an Event</h2>
-    <p class="modal-sub">Fill in the details — you can share the link with guests after.</p>
-    <div class="form-group"><label>Event Name</label><input type="text" id="new-title" placeholder="Summer Potluck at the Park"></div>
-    <div class="form-group">
-      <label>Cover Photo URL <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="url" id="new-cover-url" placeholder="https://..." oninput="previewCoverImage(this.value, 'new-cover-preview')">
-      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Paste a link to an image (Imgur, Google Photos, etc.) — shown on the event card and event page.</p>
-      <div class="cover-preview" id="new-cover-preview"></div>
-    </div>
-    <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="new-datetime"></div>
-    <div class="form-group"><label>Location</label><input type="text" id="new-location" placeholder="Volunteer Park, Seattle"></div>
-    <div class="form-group">
-      <label>Google Maps Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="url" id="new-maps-url" placeholder="https://maps.google.com/?q=...">
-      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">If set, guests can tap the location name to open it in Google Maps.</p>
-    </div>
-    <div class="form-group"><label>Description</label><textarea id="new-desc" placeholder="Tell guests what to expect…"></textarea></div>
-    <div class="form-group">
-      <label>Photo Album Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="url" id="new-album-url" placeholder="https://photos.google.com/... or similar">
-      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Link to a shared album — shown on the event page after it's created.</p>
-    </div>
-    <div class="form-group">
-      <label>RSVP Limit <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="number" id="new-rsvp-limit" min="1" placeholder="Leave blank for unlimited">
-      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Caps the number of guests who can RSVP "Yes."</p>
-    </div>
-    <div class="form-group">
-      <label>Color Theme</label>
-      <div class="color-pick" id="color-pick">
-        <div class="color-swatch selected" data-color="#FF6B4A" style="background:#FF6B4A"></div>
-        <div class="color-swatch" data-color="#FFA62B" style="background:#FFA62B"></div>
-        <div class="color-swatch" data-color="#FF5C8A" style="background:#FF5C8A"></div>
-        <div class="color-swatch" data-color="#1FA89B" style="background:#1FA89B"></div>
-        <div class="color-swatch" data-color="#FFC247" style="background:#FFC247"></div>
-        <div class="color-swatch" data-color="#5B68E8" style="background:#5B68E8"></div>
-        <div class="color-swatch" data-color="#5A2A16" style="background:#5A2A16"></div>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Attendance Badge <span style="text-transform:none;font-weight:400;color:var(--muted);">(shown on profiles of guests who attended)</span></label>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="new-badge-emoji" placeholder="🎉" style="width:64px;text-align:center;font-size:1.2rem;" maxlength="4">
-        <input type="text" id="new-badge-label" placeholder="Badge label (defaults to event name)">
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Items Guests Can Bring</label>
-      <div class="items-builder" id="items-builder"></div>
-      <button class="add-item-btn" onclick="addItemRow()">+ Add item</button>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-create')">Cancel</button>
-      <button class="btn btn-primary" id="create-event-btn" onclick="createNewEvent()">Create Event</button>
-    </div>
-  </div>
-</div>
-
-<!-- EDIT EVENT MODAL -->
-<div class="modal-overlay" id="modal-edit">
-  <div class="modal">
-    <h2>Edit Event</h2>
-    <p class="modal-sub" id="edit-modal-sub">Update the details below.</p>
-    <div class="form-group"><label>Event Name</label><input type="text" id="edit-title" placeholder="Summer Potluck at the Park"></div>
-    <div class="form-group">
-      <label>Cover Photo URL <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="url" id="edit-cover-url" placeholder="https://..." oninput="previewCoverImage(this.value, 'edit-cover-preview')">
-      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Paste a link to an image (Imgur, Google Photos, etc.) — shown on the event card and event page.</p>
-      <div class="cover-preview" id="edit-cover-preview"></div>
-    </div>
-    <div class="form-group"><label>Date & Time</label><input type="datetime-local" id="edit-datetime"></div>
-    <div class="form-group"><label>Location</label><input type="text" id="edit-location" placeholder="Volunteer Park, Seattle"></div>
-    <div class="form-group">
-      <label>Google Maps Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="url" id="edit-maps-url" placeholder="https://maps.google.com/?q=...">
-      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">If set, guests can tap the location name to open it in Google Maps.</p>
-    </div>
-    <div class="form-group"><label>Description</label><textarea id="edit-desc" placeholder="Tell guests what to expect…"></textarea></div>
-    <div class="form-group">
-      <label>Photo Album Link <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="url" id="edit-album-url" placeholder="https://photos.google.com/... or similar">
-      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Link to a shared album — shown on the event page after it's created.</p>
-    </div>
-    <div class="form-group">
-      <label>RSVP Limit <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="number" id="edit-rsvp-limit" min="1" placeholder="Leave blank for unlimited">
-      <p style="font-size:0.76rem;color:var(--muted);margin-top:6px;">Caps the number of guests who can RSVP "Yes."</p>
-    </div>
-    <div class="form-group">
-      <label>Color Theme</label>
-      <div class="color-pick" id="edit-color-pick">
-        <div class="color-swatch selected" data-color="#FF6B4A" style="background:#FF6B4A"></div>
-        <div class="color-swatch" data-color="#FFA62B" style="background:#FFA62B"></div>
-        <div class="color-swatch" data-color="#FF5C8A" style="background:#FF5C8A"></div>
-        <div class="color-swatch" data-color="#1FA89B" style="background:#1FA89B"></div>
-        <div class="color-swatch" data-color="#FFC247" style="background:#FFC247"></div>
-        <div class="color-swatch" data-color="#5B68E8" style="background:#5B68E8"></div>
-        <div class="color-swatch" data-color="#5A2A16" style="background:#5A2A16"></div>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Attendance Badge <span style="text-transform:none;font-weight:400;color:var(--muted);">(shown on profiles of guests who attended)</span></label>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="edit-badge-emoji" placeholder="🎉" style="width:64px;text-align:center;font-size:1.2rem;" maxlength="4">
-        <input type="text" id="edit-badge-label" placeholder="Badge label (defaults to event name)">
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Items Guests Can Bring</label>
-      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">Existing claimed items are shown but can't be removed. Unclaimed items can be deleted or renamed.</p>
-      <div class="items-builder" id="edit-items-builder"></div>
-      <button class="add-item-btn" onclick="addEditItemRow()">+ Add item</button>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-edit')">Cancel</button>
-      <button class="btn btn-primary" id="edit-event-btn" onclick="saveEditedEvent()">Save Changes</button>
-    </div>
-  </div>
-</div>
 
 <!-- RSVP MODAL -->
 <div class="modal-overlay" id="modal-rsvp">
@@ -1371,6 +1532,7 @@ function showApp() {
   document.getElementById('main-app').style.display = 'block';
   document.body.classList.add('app-ready');
   fetchAdminHash(); // warm the cache so first admin action is instant
+  loadCategories();
   initUserSession();
   renderAdminNav();
   const urlParams = new URLSearchParams(location.search);
@@ -1899,7 +2061,7 @@ async function fetchAllEvents() {
 
 // Fallback accent for an attendee avatar when they have no saved profile color
 // (e.g. a legacy RSVP from before accounts existed, or a profile lookup miss).
-const BRAND_AVATAR_COLORS = ['#FF6B4A', '#FFA62B', '#FF5C8A', '#1FA89B'];
+const BRAND_AVATAR_COLORS = ['#FF6B4A', '#FFA62B', '#FF5C8A', '#E8354A', '#1FA89B'];
 function brandAvatarColor(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
@@ -1924,15 +2086,17 @@ function colorForRsvp(r) {
 }
 
 async function loadEventDetail(id) {
-  const [evRes, itemRes, rsvpRes, commentRes] = await Promise.all([
+  const [evRes, itemRes, rsvpRes, commentRes, teamRes] = await Promise.all([
     sb.from('events').select('*').eq('id', id).single(),
     sb.from('items').select('*').eq('event_id', id).order('sort_order'),
     sb.from('rsvps').select('*').eq('event_id', id).order('created_at'),
-    sb.from('comments').select('*').eq('event_id', id).order('created_at')
+    sb.from('comments').select('*').eq('event_id', id).order('created_at'),
+    sb.from('event_teams').select('*').eq('event_id', id).order('sort_order')
   ]);
   if (evRes.error) throw evRes.error;
   const rsvps = rsvpRes.data || [];
   const comments = commentRes.data || [];
+  const teams = teamRes.data || [];
 
   // Batch-fetch avatar colors and names for RSVP list + comment authors.
   let avatarColors = {};
@@ -1951,7 +2115,95 @@ async function loadEventDetail(id) {
     } catch(e) { /* non-fatal — falls back to defaults */ }
   }
 
-  currentEventData = { event: evRes.data, items: itemRes.data || [], rsvps, comments, avatarColors, profileNames };
+  currentEventData = { event: evRes.data, items: itemRes.data || [], rsvps, comments, avatarColors, profileNames, teams };
+}
+
+// ─── TEAMS ────────────────────────────────────────────────────────
+const TEAM_COLORS = ['#FF6B4A', '#1FA89B', '#FFA62B', '#FF5C8A', '#E8354A', '#5B68E8', '#FFC247'];
+
+function cycleTeamColor(dot) {
+  const idx = TEAM_COLORS.indexOf(dot.dataset.color);
+  const next = TEAM_COLORS[(idx + 1) % TEAM_COLORS.length];
+  dot.dataset.color = next;
+  dot.style.background = next;
+}
+
+function addTeamRow(builderId, existing) {
+  const builder = document.getElementById(builderId);
+  if (!builder) return;
+  const row = document.createElement('div');
+  row.className = 'team-builder-row';
+  row.dataset.teamId = existing ? existing.id : '';
+  const color = existing ? (existing.color || TEAM_COLORS[0]) : TEAM_COLORS[builder.querySelectorAll('.team-builder-row').length % TEAM_COLORS.length];
+  row.innerHTML = `
+    <div class="team-color-dot" style="background:${color}" data-color="${color}" onclick="cycleTeamColor(this)" title="Click to change color"></div>
+    <input type="text" placeholder="Team name (e.g. Red Team)" value="${existing ? esc(existing.name) : ''}">
+    <button class="remove-item-btn" onclick="this.parentElement.remove()">×</button>`;
+  builder.appendChild(row);
+}
+
+function isFieldCategory(name) {
+  return /field|kickball|soccer|football|softball|baseball|volleyball|basketball|hockey|sport|futsal/i.test(name || '');
+}
+
+function teamVizHTML(event, teams, rsvps) {
+  const yesRsvps = rsvps.filter(r => r.status === 'yes');
+  const avatarColors = (currentEventData && currentEventData.avatarColors) || {};
+  const cat = allCategories.find(c => c.id === event.category_id);
+  const useField = isFieldCategory(cat ? cat.name : '');
+
+  const playerBubble = (r, size = 34) =>
+    `<div class="${useField ? 'field-player' : 'team-col-avatar'}" style="background:${(r.user_id && avatarColors[r.user_id]) || brandAvatarColor(r.name)};${size !== 34 ? `width:${size}px;height:${size}px;` : ''}" title="${esc(r.name)}">${r.name[0].toUpperCase()}</div>`;
+
+  if (useField) {
+    const sections = teams.map(t => {
+      const players = yesRsvps.filter(r => r.team_id === t.id);
+      return `<div class="field-half">
+        <div class="field-half-label" style="color:${t.color || '#fff'}">${esc(t.name)}</div>
+        <div class="field-players">${players.length
+          ? players.map(r => playerBubble(r)).join('')
+          : `<span style="color:rgba(255,255,255,0.35);font-size:0.72rem;">No players yet</span>`}</div>
+      </div>`;
+    });
+    const inner = teams.length === 2
+      ? `${sections[0]}<div class="field-center-col"><div class="field-center-circle"></div></div>${sections[1]}`
+      : sections.join('');
+    const unassigned = yesRsvps.filter(r => !r.team_id);
+    return `<div class="field-container">${inner}</div>${unassigned.length
+      ? `<div class="team-unassigned"><div class="team-unassigned-label">Not yet assigned (${unassigned.length})</div><div class="team-unassigned-pills">${unassigned.map(r => `
+          <div class="team-unassigned-pill">${playerBubble(r, 24)}<span>${esc(r.name)}</span></div>`).join('')}</div></div>` : ''}`;
+  }
+
+  // Default: column layout
+  const cols = teams.map(t => {
+    const players = yesRsvps.filter(r => r.team_id === t.id);
+    return `<div class="team-col">
+      <div class="team-col-header">
+        <div class="team-col-dot" style="background:${t.color || '#FF6B4A'}"></div>
+        ${esc(t.name)}
+        <span class="team-col-count">${players.length}</span>
+      </div>
+      <div class="team-col-players">${players.length
+        ? players.map(r => `<div class="team-col-player">${playerBubble(r, 26)}<span>${esc(r.name)}</span></div>`).join('')
+        : `<span style="color:var(--muted);font-size:0.82rem;">No players yet</span>`}</div>
+    </div>`;
+  }).join('');
+  const unassigned = yesRsvps.filter(r => !r.team_id);
+  return `<div class="team-columns">${cols}</div>${unassigned.length
+    ? `<div class="team-unassigned"><div class="team-unassigned-label">Not yet assigned (${unassigned.length})</div><div class="team-unassigned-pills">${unassigned.map(r => `
+        <div class="team-unassigned-pill">${playerBubble(r, 24)}<span>${esc(r.name)}</span></div>`).join('')}</div></div>` : ''}`;
+}
+
+async function assignTeam(rsvpId, teamId) {
+  try {
+    const { error } = await sb.rpc('assign_rsvp_team', { p_rsvp_id: rsvpId, p_team_id: teamId || null });
+    if (error) throw error;
+    const rsvp = currentEventData.rsvps.find(r => r.id === rsvpId);
+    if (rsvp) rsvp.team_id = teamId || null;
+    renderDetail();
+  } catch(e) {
+    showToast('Error assigning team: ' + e.message, true);
+  }
 }
 
 // ─── RENDER HOST DASHBOARD ────────────────────────────────────────
@@ -1988,22 +2240,77 @@ async function renderHostDashboard() {
   renderPastSection('host-past-section', past, e => eventCardHTML(e, 'host'), 'host');
 }
 
-let publicDateFilter = 'all';
-function setPublicDateFilter(key) {
-  publicDateFilter = key;
+// ─── CATEGORIES ───────────────────────────────────────────────────
+let allCategories = [];
+
+async function loadCategories() {
+  try {
+    const { data } = await sb.from('categories').select('id, name').order('name');
+    allCategories = data || [];
+  } catch(e) { allCategories = []; }
+}
+
+function populateCategorySelect(selectId, currentCategoryId = null) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— No category —</option>' +
+    allCategories.map(c =>
+      `<option value="${c.id}"${c.id === currentCategoryId ? ' selected' : ''}>${esc(c.name)}</option>`
+    ).join('');
+}
+
+function toggleNewCategoryRow(prefix) {
+  const row = document.getElementById(`${prefix}-category-row`);
+  const showing = row.style.display !== 'none';
+  row.style.display = showing ? 'none' : 'flex';
+  if (!showing) document.getElementById(`${prefix}-category-input`).focus();
+}
+
+async function saveNewCategory(prefix) {
+  const input = document.getElementById(`${prefix}-category-input`);
+  const name = input.value.trim();
+  if (!name) { showToast('Please enter a category name.', true); return; }
+  try {
+    const { data, error } = await sb.from('categories').insert([{ name }]).select('id, name').single();
+    if (error) {
+      if (error.code === '23505') { showToast('That category already exists — select it from the list.', true); }
+      else throw error;
+      return;
+    }
+    allCategories.push(data);
+    allCategories.sort((a, b) => a.name.localeCompare(b.name));
+    ['new-category-select', 'edit-category-select'].forEach(id => populateCategorySelect(id));
+    document.getElementById(`${prefix}-category-select`).value = data.id;
+    document.getElementById(`${prefix}-category-row`).style.display = 'none';
+    input.value = '';
+    showToast(`"${name}" added as a category`);
+  } catch(e) {
+    showToast('Error adding category: ' + e.message, true);
+  }
+}
+
+// ─── BROWSE PAGE FILTER (by category) ─────────────────────────────
+let publicCategoryFilter = 'all';
+
+function setPublicCategoryFilter(key) {
+  publicCategoryFilter = key;
   renderPublicEvents(document.querySelector('#view-public .search-bar')?.value || '');
 }
-function withinPublicDateFilter(e) {
-  if (publicDateFilter === 'all' || !e.datetime) return true;
-  const days = Math.ceil((new Date(e.datetime) - Date.now()) / 86400000);
-  if (publicDateFilter === 'week') return days <= 7;
-  if (publicDateFilter === 'month') return days <= 31;
-  return true;
+
+function withinPublicCategoryFilter(e) {
+  if (publicCategoryFilter === 'all') return true;
+  return e.category_id === publicCategoryFilter;
 }
+
 function renderPublicFilterChips() {
-  const chips = [['all', 'All'], ['week', 'This week'], ['month', 'This month']];
+  const now = Date.now();
+  const usedCatIds = new Set(allEvents
+    .filter(e => e.datetime && new Date(e.datetime) > now && e.category_id)
+    .map(e => e.category_id));
+  const usedCats = allCategories.filter(c => usedCatIds.has(c.id));
+  const chips = [['all', 'All'], ...usedCats.map(c => [c.id, c.name])];
   document.getElementById('public-filter-chips').innerHTML = chips.map(([key, label]) =>
-    `<button class="filter-chip${publicDateFilter === key ? ' active' : ''}" onclick="setPublicDateFilter('${key}')">${label}</button>`
+    `<button class="filter-chip${publicCategoryFilter === key ? ' active' : ''}" onclick="setPublicCategoryFilter('${key}')">${label}</button>`
   ).join('');
 }
 
@@ -2025,7 +2332,7 @@ async function renderPublicEvents(filter = '') {
   hideLoading();
   const filtered = allEvents
     .filter(e => !filter || e.title.toLowerCase().includes(filter.toLowerCase()) || (e.location||'').toLowerCase().includes(filter.toLowerCase()))
-    .filter(withinPublicDateFilter);
+    .filter(withinPublicCategoryFilter);
   const { upcoming, past } = splitUpcomingPast(filtered);
 
   const grid = document.getElementById('public-events-grid');
@@ -2174,7 +2481,7 @@ async function renderAccountSettings() {
       <div class="form-group">
         <label>Avatar Color</label>
         <div class="color-pick" id="account-avatar-color-pick">
-          ${['#FF6B4A','#FFA62B','#FF5C8A','#1FA89B','#FFC247','#5B68E8','#5A2A16'].map(c =>
+          ${['#FF6B4A','#FFA62B','#FF5C8A','#E8354A','#1FA89B','#FFC247','#5B68E8','#5A2A16'].map(c =>
             `<div class="color-swatch${(currentUser.user_metadata?.avatar_color || '#FF6B4A') === c ? ' selected' : ''}" data-color="${c}" style="background:${c}"></div>`
           ).join('')}
         </div>
@@ -2525,6 +2832,11 @@ function coverStyleFragment(e) {
     : '';
 }
 
+function categoryTagHTML(e) {
+  const cat = allCategories.find(c => c.id === e.category_id);
+  return cat ? `<div class="event-cat-tag">${esc(cat.name)}</div>` : '';
+}
+
 function eventCardHTML(e, context, mineInfo) {
   const accent = e.color || '#FF6B4A';
   const date = fmtDate(e.datetime, {weekday:'short',month:'short',day:'numeric'});
@@ -2536,6 +2848,7 @@ function eventCardHTML(e, context, mineInfo) {
       ${e.datetime ? `<span class="event-card-datepill">${date}${time?' · '+time:''}</span>` : ''}
     </div>
     <div class="event-card-body">
+      ${categoryTagHTML(e)}
       <h3>${esc(e.title)}</h3>
       <div class="event-card-meta">${e.location ? esc(e.location) : 'Location TBD'}</div>
       ${mineTagsHTML(context, mineInfo)}
@@ -2562,6 +2875,7 @@ function heroCardHTML(e, context, mineInfo) {
       ${e.datetime ? `<span class="hero-card-eyebrow">${relativeSoonLabel(e.datetime)}</span>` : ''}
     </div>
     <div class="hero-card-body">
+      ${categoryTagHTML(e)}
       <h2 onclick="showDetail('${e.id}','${fromView}')">${esc(e.title)}</h2>
       <div class="hero-card-meta">${date}${time?' · '+time:''}${e.location?' · '+esc(e.location):''}</div>
       ${desc ? `<p class="hero-card-desc">${desc}</p>` : ''}
@@ -2614,21 +2928,37 @@ function renderDetail() {
     <div class="detail-meta-item">📅 <strong>${date}${time?' at '+time:''}</strong></div>
     ${e.location?`<div class="detail-meta-item">📍 <strong>${locationHtml}</strong></div>`:''}
     <div class="detail-meta-item">🙋 <strong>${yesCount}${hasLimit ? ' / ' + e.rsvp_limit : ''} attending</strong>${limitReached ? ' <span class="badge badge-no" style="margin-left:4px;">Full</span>' : ''}</div>`;
+  const infoBlocks = [
+    e.payment      && { label: '💳 Payment',       value: e.payment },
+    e.what_to_bring && { label: '🎒 What to bring', value: e.what_to_bring },
+  ].filter(Boolean);
+  document.getElementById('detail-info-blocks').innerHTML = infoBlocks.map(b =>
+    `<div class="detail-info-block"><div class="detail-info-label">${b.label}</div><div class="detail-info-value">${esc(b.value)}</div></div>`
+  ).join('');
   document.getElementById('detail-desc').textContent = e.description || '';
 
   const shareUrl = `${location.origin}${location.pathname}?event=${e.id}`;
-  document.getElementById('detail-share').innerHTML = `
-    <div>
-      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.05em;">Share this event</div>
-      <div class="share-url">${shareUrl}</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      ${e.album_url ? `<a href="${esc(e.album_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm">📷 Photo Album</a>` : ''}
-      <button class="btn btn-ghost btn-sm" onclick="copyLink('${shareUrl}')">Copy Link</button>
-    </div>`;
+  const albumBtn = document.getElementById('detail-album-btn');
+  albumBtn.innerHTML = e.album_url
+    ? `<a href="${esc(e.album_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm" style="margin-top:14px;display:inline-flex;align-items:center;gap:6px;">📷 Photo Album</a>`
+    : '';
+  document.getElementById('detail-share').innerHTML = `<button class="btn btn-ghost btn-sm" onclick="copyLink('${shareUrl}')">🔗 Share</button>`;
 
   document.getElementById('detail-actions').innerHTML = isAdminLoggedIn()
     ? `<button class="btn btn-danger btn-sm" onclick="requireAdmin(()=>deleteEvent('${e.id}'))">🗑 Delete Event</button>` : '';
+
+  // Teams visualization
+  const teams = currentEventData.teams || [];
+  const vizSection = document.getElementById('team-viz-section');
+  if (teams.length) {
+    const cat = allCategories.find(c => c.id === e.category_id);
+    const vizLabel = isFieldCategory(cat ? cat.name : '') ? '🏟️ Field' : '🏆 Teams';
+    vizSection.style.display = '';
+    vizSection.innerHTML = `<div class="team-viz-panel"><h2>${vizLabel}</h2>${teamVizHTML(e, teams, rsvps)}</div>`;
+  } else {
+    vizSection.style.display = 'none';
+    vizSection.innerHTML = '';
+  }
 
   // RSVPs
   document.getElementById('rsvp-count-badge').textContent = `(${rsvps.length})`;
@@ -2639,6 +2969,11 @@ function renderDetail() {
   rsvpList.innerHTML = sortedRsvps.length
     ? sortedRsvps.map(r => {
         const avColor = (r.user_id && avatarColors[r.user_id]) || '#F59E0B';
+        const teamSelect = isAdmin && teams.length
+          ? `<select class="team-assign-select" onchange="assignTeam('${r.id}', this.value)">
+              <option value="">— team —</option>
+              ${teams.map(t => `<option value="${t.id}"${r.team_id === t.id ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}
+            </select>` : '';
         return `<div class="rsvp-item">
         <div class="avatar" style="background:${esc(avColor)};">${r.name[0].toUpperCase()}</div>
         ${r.user_id
@@ -2646,6 +2981,7 @@ function renderDetail() {
           : `<span class="name">${esc(r.name)}</span>`}
         ${r.note?`<span style="color:var(--muted);font-size:0.78rem;font-style:italic">"${esc(r.note)}"</span>`:''}
         <span class="badge badge-${r.status}">${r.status==='yes'?'Going':r.status==='maybe'?'Maybe':'Nope'}</span>
+        ${teamSelect}
         ${isAdmin?`<button class="row-delete-btn" title="Remove this RSVP" onclick="requireAdmin(()=>deleteRsvp('${r.id}'))">🗑</button>`:''}
       </div>`;
       }).join('')
@@ -2785,14 +3121,27 @@ async function deleteComment(commentId) {
 }
 
 // ─── CREATE EVENT ─────────────────────────────────────────────────
+function backFromEventForm() {
+  switchView(fromView || 'host');
+}
+
 function openCreateModal() {
-  ['new-title','new-cover-url','new-datetime','new-location','new-maps-url','new-album-url','new-desc','new-rsvp-limit','new-badge-emoji','new-badge-label'].forEach(id => document.getElementById(id).value = '');
+  fromView = currentView;
+  ['new-title','new-cover-url','new-datetime','new-location','new-maps-url','new-album-url','new-payment','new-what-to-bring','new-desc','new-rsvp-limit','new-badge-emoji','new-badge-label'].forEach(id => document.getElementById(id).value = '');
   previewCoverImage('', 'new-cover-preview');
+  populateCategorySelect('new-category-select');
+  document.getElementById('new-category-row').style.display = 'none';
+  document.getElementById('new-category-input').value = '';
   selectedColor = '#FF6B4A';
-  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s.dataset.color === selectedColor));
+  document.querySelectorAll('#view-create-event .color-swatch').forEach(s => s.classList.toggle('selected', s.dataset.color === selectedColor));
+  document.getElementById('teams-builder').innerHTML = '';
   document.getElementById('items-builder').innerHTML = '';
   addItemRow();
-  openModal('modal-create');
+  currentView = 'create-event';
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-create-event').classList.add('active');
+  document.querySelectorAll('.nav-tab, .tabbar-item').forEach(t => t.classList.remove('active'));
+  window.scrollTo(0, 0);
 }
 
 function addItemRow() {
@@ -2808,7 +3157,7 @@ document.getElementById('color-pick').addEventListener('click', ev => {
   const swatch = ev.target.closest('.color-swatch');
   if (!swatch) return;
   selectedColor = swatch.dataset.color;
-  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s === swatch));
+  document.querySelectorAll('#color-pick .color-swatch').forEach(s => s.classList.toggle('selected', s === swatch));
 });
 
 async function createNewEvent() {
@@ -2849,18 +3198,29 @@ async function createNewEvent() {
       maps_url: mapsUrlRaw || null,
       album_url: albumUrlRaw || null,
       description: document.getElementById('new-desc').value.trim() || null,
+      payment: document.getElementById('new-payment').value.trim() || null,
+      what_to_bring: document.getElementById('new-what-to-bring').value.trim() || null,
       color: selectedColor,
+      category_id: document.getElementById('new-category-select').value || null,
       rsvp_limit: rsvpLimit,
       badge_emoji: document.getElementById('new-badge-emoji').value.trim() || '🎉',
       badge_label: document.getElementById('new-badge-label').value.trim() || null
     }]).select().single();
     if (evErr) throw evErr;
+    const teamRows = [...document.querySelectorAll('#teams-builder .team-builder-row')].map((row, i) => {
+      const name = row.querySelector('input').value.trim();
+      const color = row.querySelector('.team-color-dot').dataset.color;
+      return name ? { event_id: ev.id, name, color, sort_order: i } : null;
+    }).filter(Boolean);
+    if (teamRows.length) {
+      const { error: teamErr } = await sb.from('event_teams').insert(teamRows);
+      if (teamErr) throw teamErr;
+    }
     if (itemRows.length) {
       const { error: itemErr } = await sb.from('items').insert(itemRows.map(r => ({ ...r, event_id: ev.id, claimed_by: null })));
       if (itemErr) throw itemErr;
     }
 
-    closeModal('modal-create');
     showToast('Event created! 🎉');
     switchView('host');
   } catch(e) {
@@ -2880,21 +3240,24 @@ document.getElementById('edit-color-pick').addEventListener('click', ev => {
 // ─── EDIT EVENT ───────────────────────────────────────────────────
 let editEventId = null;
 let editSelectedColor = '#F59E0B';
-let editOriginalItems = []; // items as they exist in DB when modal opened
+let editOriginalItems = [];
+let editOriginalTeams = [];
 
 async function openEditModal(eventId) {
   editEventId = eventId;
   showLoading('Loading event…');
   try {
-    const [evRes, itemRes] = await Promise.all([
+    const [evRes, itemRes, teamRes] = await Promise.all([
       sb.from('events').select('*').eq('id', eventId).single(),
-      sb.from('items').select('*').eq('event_id', eventId).order('sort_order')
+      sb.from('items').select('*').eq('event_id', eventId).order('sort_order'),
+      sb.from('event_teams').select('*').eq('event_id', eventId).order('sort_order')
     ]);
     if (evRes.error) throw evRes.error;
     hideLoading();
 
     const e = evRes.data;
     editOriginalItems = itemRes.data || [];
+    editOriginalTeams = teamRes.data || [];
 
     // Populate fields
     document.getElementById('edit-title').value = e.title || '';
@@ -2904,23 +3267,40 @@ async function openEditModal(eventId) {
     document.getElementById('edit-location').value = e.location || '';
     document.getElementById('edit-maps-url').value = e.maps_url || '';
     document.getElementById('edit-album-url').value = e.album_url || '';
+    document.getElementById('edit-payment').value = e.payment || '';
+    document.getElementById('edit-what-to-bring').value = e.what_to_bring || '';
     document.getElementById('edit-badge-emoji').value = e.badge_emoji || '🎉';
     document.getElementById('edit-badge-label').value = e.badge_label || '';
     document.getElementById('edit-desc').value = e.description || '';
     document.getElementById('edit-rsvp-limit').value = e.rsvp_limit != null ? e.rsvp_limit : '';
     document.getElementById('edit-modal-sub').textContent = `Editing: ${e.title}`;
 
+    // Category
+    populateCategorySelect('edit-category-select', e.category_id || null);
+    document.getElementById('edit-category-row').style.display = 'none';
+    document.getElementById('edit-category-input').value = '';
+
     // Color
     editSelectedColor = e.color || '#F59E0B';
     document.querySelectorAll('#edit-color-pick .color-swatch').forEach(s =>
       s.classList.toggle('selected', s.dataset.color === editSelectedColor));
+
+    // Teams
+    const teamsBuilder = document.getElementById('edit-teams-builder');
+    teamsBuilder.innerHTML = '';
+    editOriginalTeams.forEach(t => addTeamRow('edit-teams-builder', t));
 
     // Items
     const builder = document.getElementById('edit-items-builder');
     builder.innerHTML = '';
     editOriginalItems.forEach(it => addEditItemRow(it));
 
-    openModal('modal-edit');
+    fromView = currentView;
+    currentView = 'edit-event';
+    document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+    document.getElementById('view-edit-event').classList.add('active');
+    document.querySelectorAll('.nav-tab, .tabbar-item').forEach(t => t.classList.remove('active'));
+    window.scrollTo(0, 0);
   } catch(err) {
     hideLoading();
     showToast('Error loading event: ' + err.message, true);
@@ -2986,7 +3366,10 @@ async function saveEditedEvent() {
       maps_url: mapsUrlRaw || null,
       album_url: albumUrlRaw || null,
       description: document.getElementById('edit-desc').value.trim() || null,
+      payment: document.getElementById('edit-payment').value.trim() || null,
+      what_to_bring: document.getElementById('edit-what-to-bring').value.trim() || null,
       color: editSelectedColor,
+      category_id: document.getElementById('edit-category-select').value || null,
       rsvp_limit: rsvpLimit,
       badge_emoji: document.getElementById('edit-badge-emoji').value.trim() || '🎉',
       badge_label: document.getElementById('edit-badge-label').value.trim() || null
@@ -3032,9 +3415,31 @@ async function saveEditedEvent() {
       if (error) throw error;
     }
 
-    closeModal('modal-edit');
+    // 4. Reconcile teams
+    const teamBuilderRows = [...document.querySelectorAll('#edit-teams-builder .team-builder-row')];
+    const savedTeamIds = new Set();
+    for (let i = 0; i < teamBuilderRows.length; i++) {
+      const row = teamBuilderRows[i];
+      const teamId = row.dataset.teamId;
+      const name = row.querySelector('input').value.trim();
+      if (!name) continue;
+      const color = row.querySelector('.team-color-dot').dataset.color;
+      if (teamId) {
+        savedTeamIds.add(teamId);
+        await sb.from('event_teams').update({ name, color, sort_order: i }).eq('id', teamId);
+      } else {
+        const { data: newTeam } = await sb.from('event_teams').insert([{ event_id: editEventId, name, color, sort_order: i }]).select('id').single();
+        if (newTeam) savedTeamIds.add(newTeam.id);
+      }
+    }
+    for (const t of editOriginalTeams) {
+      if (!savedTeamIds.has(t.id)) {
+        await sb.from('event_teams').delete().eq('id', t.id);
+      }
+    }
+
     showToast('Event updated ✓');
-    renderHostDashboard();
+    switchView(fromView || 'host');
 
     // If currently viewing this event's detail page, refresh it too
     if (currentEventId === editEventId) {
