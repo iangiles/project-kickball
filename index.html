@@ -455,6 +455,7 @@
   .field-center-circle { width: 52px; height: 52px; border: 2px solid rgba(255,255,255,0.28); border-radius: 50%; }
   .field-players { display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start; }
   .field-player { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 0.72rem; font-family: var(--font-ui); border: 2px solid rgba(255,255,255,0.45); box-shadow: 0 2px 8px rgba(0,0,0,0.35); cursor: default; flex-shrink: 0; }
+  .field-name-tag { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 99px; background: rgba(255,255,255,0.18); color: #fff; font-size: 0.72rem; font-weight: 700; font-family: var(--font-ui); border: 1px solid rgba(255,255,255,0.32); white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
   /* Default column visualization */
   .team-columns { display: flex; gap: 12px; flex-wrap: wrap; }
   .team-col { flex: 1; min-width: 130px; background: var(--card); border-radius: 14px; padding: 14px 16px; }
@@ -2161,7 +2162,7 @@ function teamVizHTML(event, teams, rsvps) {
       return `<div class="field-half">
         <div class="field-half-label" style="color:${t.color || '#fff'}">${esc(t.name)}</div>
         <div class="field-players">${players.length
-          ? players.map(r => playerBubble(r)).join('')
+          ? players.map(r => `<div class="field-name-tag">${esc(r.name)}</div>`).join('')
           : `<span style="color:rgba(255,255,255,0.35);font-size:0.72rem;">No players yet</span>`}</div>
       </div>`;
     });
