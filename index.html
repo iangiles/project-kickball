@@ -458,6 +458,11 @@
   .item-builder-row { display: flex; gap: 8px; align-items: center; }
   .item-builder-row input { flex: 1; }
   .item-builder-row input.qty { width: 70px; flex: none; }
+  .item-category-picker { display: flex; gap: 10px; flex: none; }
+  .item-category-check { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; color: var(--muted); white-space: nowrap; cursor: pointer; flex: none; }
+  .item-category-check input { accent-color: var(--sage); width: 15px; height: 15px; flex: none; margin: 0; }
+  .item-category-heading { font-family: var(--font-ui); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .item-category-heading:not(:first-child) { margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--border); }
   .remove-item-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; padding: 4px; line-height: 1; transition: color 0.15s; }
   .remove-item-btn:hover { color: var(--rose); }
   .add-item-btn { background: none; border: 1.5px dashed var(--border); border-radius: 12px; color: var(--muted); font-size: 0.82rem; font-weight: 600; cursor: pointer; padding: 10px; width: 100%; font-family: inherit; transition: all 0.15s; }
@@ -803,7 +808,11 @@ insert into categories (name) values
   ('Birthday'), ('Brunch'), ('Beach day'), ('Dinner'),
   ('Drinks'), ('Game night'), ('Hiking'), ('Karaoke'),
   ('Movie night'), ('Potluck')
-on conflict on constraint categories_name_unique do nothing;</div>
+on conflict on constraint categories_name_unique do nothing;
+
+-- Item categories: sign-up list items are either food/drinks or equipment,
+-- so the sign-up list can group food/drinks before equipment.
+alter table items add column if not exists category text not null default 'food' check (category in ('food','equipment'));</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
     <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ This block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, a cover photo URL field, and enforces an optional RSVP cap — all at the database level, using a true UTC comparison.</p>
@@ -2968,13 +2977,13 @@ function renderDetail() {
     ? `<div class="items-bar-label"><span style="font-size:0.8rem;color:var(--muted);">${claimed} of ${total} items claimed</span><span style="font-size:0.8rem;color:var(--sage);">${pct}%</span></div>
        <div class="items-bar"><div class="items-bar-fill" style="width:${pct}%"></div></div>` : '';
   document.getElementById('items-list').innerHTML = items.length
-    ? items.map(it => `<div class="item-row">
+    ? renderItemGroups(items, it => `<div class="item-row">
         <div class="item-dot ${it.claimed_by?'claimed':''}"></div>
         <span class="item-name ${it.claimed_by?'item-claimed':''}">${esc(it.name)}</span>
         ${it.qty>1?`<span class="item-qty">×${it.qty}</span>`:''}
         ${it.claimed_by?`<span class="item-claimer">✓ ${esc(it.claimed_by)}</span>`:'<span style="color:var(--muted);font-size:0.75rem;">Open</span>'}
         ${isAdmin && it.claimed_by?`<button class="row-delete-btn" title="Unclaim this item" onclick="requireAdmin(()=>unclaimItem('${it.id}'))">🗑</button>`:''}
-      </div>`).join('')
+      </div>`)
     : '<p style="color:var(--muted);font-size:0.85rem;">No items needed — just bring yourself!</p>';
 
   // RSVP / claim actions — disabled once the event is in the past
@@ -3124,6 +3133,10 @@ function addItemRow() {
   row.className = 'item-builder-row';
   row.innerHTML = `<input type="text" placeholder="Item name (e.g. Potato salad)">
     <input type="number" class="qty" value="1" min="1" placeholder="Qty">
+    <div class="item-category-picker">
+      <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="food" checked onchange="toggleItemCategory(this)"> 🍔 Food/Drinks</label>
+      <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="equipment" onchange="toggleItemCategory(this)"> 🧰 Equipment</label>
+    </div>
     <button class="remove-item-btn" onclick="this.parentElement.remove()">×</button>`;
   document.getElementById('items-builder').appendChild(row);
 }
@@ -3160,7 +3173,8 @@ async function createNewEvent() {
       if (!textInput) return null;
       const name = textInput.value.trim();
     const qty = parseInt(r.querySelector('.qty').value) || 1;
-    return name ? { name, qty, sort_order: i } : null;
+    const category = getItemCategoryFromRow(r);
+    return name ? { name, qty, category, sort_order: i } : null;
   }).filter(Boolean);
 
   setBtnLoading('create-event-btn', true);
@@ -3288,9 +3302,14 @@ function addEditItemRow(existing) {
   row.className = 'item-builder-row';
   const isClaimed = existing && existing.claimed_by;
   row.dataset.itemId = existing ? existing.id : '';
+  const isEquipment = existing && existing.category === 'equipment';
   row.innerHTML = `
     <input type="text" placeholder="Item name" value="${existing ? esc(existing.name) : ''}" ${isClaimed ? 'title="This item has been claimed and cannot be renamed"' : ''}>
     <input type="number" class="qty" value="${existing ? existing.qty : 1}" min="1" placeholder="Qty">
+    <div class="item-category-picker">
+      <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="food" ${isEquipment ? '' : 'checked'} onchange="toggleItemCategory(this)"> 🍔 Food/Drinks</label>
+      <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="equipment" ${isEquipment ? 'checked' : ''} onchange="toggleItemCategory(this)"> 🧰 Equipment</label>
+    </div>
     <button class="remove-item-btn" onclick="removeEditItemRow(this, ${isClaimed})" title="${isClaimed ? 'Cannot remove — already claimed by ' + esc(existing.claimed_by) : 'Remove item'}">×</button>`;
   if (isClaimed) {
     row.style.opacity = '0.6';
@@ -3362,23 +3381,24 @@ async function saveEditedEvent() {
       const nameInput = row.querySelector('input[type=text]');
       const name = nameInput.value.trim();
       const qty = parseInt(row.querySelector('.qty').value) || 1;
+      const category = getItemCategoryFromRow(row);
       const isClaimed = nameInput.disabled; // disabled = claimed, skip name update
 
       if (itemId) {
         currentRowIds.add(itemId);
         if (!isClaimed) {
           // Update existing unclaimed item
-          const { error } = await sb.from('items').update({ name, qty, sort_order: i }).eq('id', itemId);
+          const { error } = await sb.from('items').update({ name, qty, category, sort_order: i }).eq('id', itemId);
           if (error) throw error;
         } else {
-          // Update only sort_order for claimed items
-          const { error } = await sb.from('items').update({ sort_order: i }).eq('id', itemId);
+          // Update sort_order and category for claimed items (name/qty are locked)
+          const { error } = await sb.from('items').update({ sort_order: i, category }).eq('id', itemId);
           if (error) throw error;
         }
       } else if (name) {
         // Insert new item
         const { error } = await sb.from('items').insert({
-          event_id: editEventId, name, qty, sort_order: i, claimed_by: null
+          event_id: editEventId, name, qty, category, sort_order: i, claimed_by: null
         });
         if (error) throw error;
       }
@@ -3541,12 +3561,12 @@ function openClaimModal() {
   const list = document.getElementById('claim-items-list');
   list.innerHTML = !items.length
     ? '<p style="color:var(--muted);font-size:0.85rem;">No items on the list for this event.</p>'
-    : items.map(it => `
+    : renderItemGroups(items, it => `
       <label class="claim-item-row ${it.claimed_by?'taken':''}">
         <input type="checkbox" data-id="${it.id}" ${it.claimed_by?'disabled':''}>
         <span class="claim-item-name">${esc(it.name)}${it.qty>1?` <span style="color:var(--muted)">×${it.qty}</span>`:''}</span>
         ${it.claimed_by?`<span class="claim-item-taken-by">Taken by ${esc(it.claimed_by)}</span>`:''}
-      </label>`).join('');
+      </label>`);
   document.getElementById('new-items-builder').innerHTML = '';
   openModal('modal-claim');
 }
@@ -3556,6 +3576,10 @@ function addNewClaimItemRow() {
   row.className = 'item-builder-row';
   row.innerHTML = `<input type="text" placeholder="Item name (e.g. Plates)">
     <input type="number" class="qty" value="1" min="1" placeholder="Qty">
+    <div class="item-category-picker">
+      <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="food" checked onchange="toggleItemCategory(this)"> 🍔 Food/Drinks</label>
+      <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="equipment" onchange="toggleItemCategory(this)"> 🧰 Equipment</label>
+    </div>
     <button class="remove-item-btn" onclick="this.parentElement.remove()">×</button>`;
   document.getElementById('new-items-builder').appendChild(row);
 }
@@ -3569,7 +3593,8 @@ async function submitClaim() {
   const newItems = newRows.map(r => {
     const itemName = r.querySelector('input[type=text]').value.trim();
     const qty = parseInt(r.querySelector('.qty').value) || 1;
-    return itemName ? { name: itemName, qty } : null;
+    const category = getItemCategoryFromRow(r);
+    return itemName ? { name: itemName, qty, category } : null;
   }).filter(Boolean);
 
   if (!checks.length && !newItems.length) { showToast('Select an item or add a new one.', true); return; }
@@ -3589,6 +3614,7 @@ async function submitClaim() {
         event_id: currentEventId,
         name: it.name,
         qty: it.qty,
+        category: it.category,
         claimed_by: name,
         claimed_by_user_id: claimedByUserId,
         sort_order: maxSort + i + 1
@@ -3659,6 +3685,26 @@ function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function isValidUrl(str) {
   try { const u = new URL(str); return u.protocol === 'http:' || u.protocol === 'https:'; }
   catch(e) { return false; }
+}
+function toggleItemCategory(checkbox) {
+  const row = checkbox.closest('.item-builder-row');
+  const boxes = [...row.querySelectorAll('.item-category-input')];
+  if (checkbox.checked) {
+    boxes.forEach(cb => { if (cb !== checkbox) cb.checked = false; });
+  } else {
+    checkbox.checked = true; // exactly one category must stay selected
+  }
+}
+function getItemCategoryFromRow(row) {
+  return row.querySelector('.item-category-input[data-cat="equipment"]')?.checked ? 'equipment' : 'food';
+}
+function renderItemGroups(items, rowRenderer) {
+  const food = items.filter(it => it.category !== 'equipment');
+  const equipment = items.filter(it => it.category === 'equipment');
+  let html = '';
+  if (food.length) html += `<div class="item-category-heading">🍔 Food &amp; Drinks</div>` + food.map(rowRenderer).join('');
+  if (equipment.length) html += `<div class="item-category-heading">🧰 Equipment</div>` + equipment.map(rowRenderer).join('');
+  return html;
 }
 function previewCoverImage(url, previewId) {
   const el = document.getElementById(previewId);
