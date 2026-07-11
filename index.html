@@ -455,10 +455,11 @@
   .cover-preview .cover-preview-error { font-size: 0.78rem; color: var(--rose); padding: 12px 14px; }
   .items-builder { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
   .new-items-builder { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-  .item-builder-row { display: flex; gap: 8px; align-items: center; }
-  .item-builder-row input { flex: 1; }
-  .item-builder-row input.qty { width: 70px; flex: none; }
-  .item-category-picker { display: flex; gap: 10px; flex: none; }
+  .item-builder-row { display: flex; flex-direction: column; gap: 8px; }
+  .item-builder-fields { display: flex; gap: 8px; align-items: center; }
+  .item-builder-fields input { flex: 1; }
+  .item-builder-fields input.qty { width: 70px; flex: none; }
+  .item-category-picker { display: flex; gap: 10px; }
   .item-category-check { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; color: var(--muted); white-space: nowrap; cursor: pointer; flex: none; }
   .item-category-check input { accent-color: var(--sage); width: 15px; height: 15px; flex: none; margin: 0; }
   .item-category-heading { font-family: var(--font-ui); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
@@ -3131,13 +3132,15 @@ function openCreateModal() {
 function addItemRow() {
   const row = document.createElement('div');
   row.className = 'item-builder-row';
-  row.innerHTML = `<input type="text" placeholder="Item name (e.g. Potato salad)">
-    <input type="number" class="qty" value="1" min="1" placeholder="Qty">
+  row.innerHTML = `<div class="item-builder-fields">
+      <input type="text" placeholder="Item name (e.g. Potato salad)">
+      <input type="number" class="qty" value="1" min="1" placeholder="Qty">
+      <button class="remove-item-btn" onclick="this.closest('.item-builder-row').remove()">×</button>
+    </div>
     <div class="item-category-picker">
       <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="food" checked onchange="toggleItemCategory(this)"> 🍔 Food/Drinks</label>
       <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="equipment" onchange="toggleItemCategory(this)"> 🧰 Equipment</label>
-    </div>
-    <button class="remove-item-btn" onclick="this.parentElement.remove()">×</button>`;
+    </div>`;
   document.getElementById('items-builder').appendChild(row);
 }
 
@@ -3304,13 +3307,15 @@ function addEditItemRow(existing) {
   row.dataset.itemId = existing ? existing.id : '';
   const isEquipment = existing && existing.category === 'equipment';
   row.innerHTML = `
-    <input type="text" placeholder="Item name" value="${existing ? esc(existing.name) : ''}" ${isClaimed ? 'title="This item has been claimed and cannot be renamed"' : ''}>
-    <input type="number" class="qty" value="${existing ? existing.qty : 1}" min="1" placeholder="Qty">
+    <div class="item-builder-fields">
+      <input type="text" placeholder="Item name" value="${existing ? esc(existing.name) : ''}" ${isClaimed ? 'title="This item has been claimed and cannot be renamed"' : ''}>
+      <input type="number" class="qty" value="${existing ? existing.qty : 1}" min="1" placeholder="Qty">
+      <button class="remove-item-btn" onclick="removeEditItemRow(this, ${isClaimed})" title="${isClaimed ? 'Cannot remove — already claimed by ' + esc(existing.claimed_by) : 'Remove item'}">×</button>
+    </div>
     <div class="item-category-picker">
       <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="food" ${isEquipment ? '' : 'checked'} onchange="toggleItemCategory(this)"> 🍔 Food/Drinks</label>
       <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="equipment" ${isEquipment ? 'checked' : ''} onchange="toggleItemCategory(this)"> 🧰 Equipment</label>
-    </div>
-    <button class="remove-item-btn" onclick="removeEditItemRow(this, ${isClaimed})" title="${isClaimed ? 'Cannot remove — already claimed by ' + esc(existing.claimed_by) : 'Remove item'}">×</button>`;
+    </div>`;
   if (isClaimed) {
     row.style.opacity = '0.6';
     row.querySelector('input[type=text]').disabled = true;
@@ -3321,7 +3326,7 @@ function addEditItemRow(existing) {
 
 function removeEditItemRow(btn, isClaimed) {
   if (isClaimed) { showToast('This item has been claimed and can\'t be removed.', true); return; }
-  btn.parentElement.remove();
+  btn.closest('.item-builder-row').remove();
 }
 
 async function saveEditedEvent() {
@@ -3574,13 +3579,15 @@ function openClaimModal() {
 function addNewClaimItemRow() {
   const row = document.createElement('div');
   row.className = 'item-builder-row';
-  row.innerHTML = `<input type="text" placeholder="Item name (e.g. Plates)">
-    <input type="number" class="qty" value="1" min="1" placeholder="Qty">
+  row.innerHTML = `<div class="item-builder-fields">
+      <input type="text" placeholder="Item name (e.g. Plates)">
+      <input type="number" class="qty" value="1" min="1" placeholder="Qty">
+      <button class="remove-item-btn" onclick="this.closest('.item-builder-row').remove()">×</button>
+    </div>
     <div class="item-category-picker">
       <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="food" checked onchange="toggleItemCategory(this)"> 🍔 Food/Drinks</label>
       <label class="item-category-check"><input type="checkbox" class="item-category-input" data-cat="equipment" onchange="toggleItemCategory(this)"> 🧰 Equipment</label>
-    </div>
-    <button class="remove-item-btn" onclick="this.parentElement.remove()">×</button>`;
+    </div>`;
   document.getElementById('new-items-builder').appendChild(row);
 }
 
