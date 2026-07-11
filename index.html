@@ -389,7 +389,7 @@
   .item-row { display: flex; align-items: center; gap: 10px; padding: 11px 13px; background: var(--card); border-radius: 12px; font-size: 0.88rem; }
   .item-row .item-name { flex: 1; font-weight: 600; }
   .item-row .item-qty { color: var(--muted); font-size: 0.78rem; }
-  .item-claimed { text-decoration: line-through; color: var(--muted); }
+  .item-claimed { color: var(--muted); }
   .item-claimer { font-size: 0.75rem; color: var(--sage); }
   .item-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--card); border: 2px solid var(--sage); flex-shrink: 0; }
   .item-dot.claimed { background: var(--sage); border-color: var(--sage); }
@@ -3568,7 +3568,7 @@ function openClaimModal() {
     ? '<p style="color:var(--muted);font-size:0.85rem;">No items on the list for this event.</p>'
     : renderItemGroups(items, it => `
       <label class="claim-item-row ${it.claimed_by?'taken':''}">
-        <input type="checkbox" data-id="${it.id}" ${it.claimed_by?'disabled':''}>
+        <input type="checkbox" data-id="${it.id}" ${it.claimed_by?'disabled checked':''}>
         <span class="claim-item-name">${esc(it.name)}${it.qty>1?` <span style="color:var(--muted)">×${it.qty}</span>`:''}</span>
         ${it.claimed_by?`<span class="claim-item-taken-by">Taken by ${esc(it.claimed_by)}</span>`:''}
       </label>`);
@@ -3595,7 +3595,7 @@ async function submitClaim() {
   const name = document.getElementById('claim-name').value.trim();
   if (!name) { showToast('Please enter your name.', true); return; }
 
-  const checks = [...document.querySelectorAll('#claim-items-list input[type=checkbox]:checked')];
+  const checks = [...document.querySelectorAll('#claim-items-list input[type=checkbox]:checked:not(:disabled)')];
   const newRows = [...document.querySelectorAll('#new-items-builder .item-builder-row')];
   const newItems = newRows.map(r => {
     const itemName = r.querySelector('input[type=text]').value.trim();
