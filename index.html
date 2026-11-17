@@ -813,7 +813,99 @@ on conflict on constraint categories_name_unique do nothing;
 
 -- Item categories: sign-up list items are either food/drinks or equipment,
 -- so the sign-up list can group food/drinks before equipment.
-alter table items add column if not exists category text not null default 'food' check (category in ('food','equipment'));</div>
+alter table items add column if not exists category text not null default 'food' check (category in ('food','equipment'));
+
+-- Cultural exchange: a separate admin-curated page at /cultural-exchange where
+-- an allowlisted group of friends track monthly shared activities together.
+-- Access is gated entirely by rows in cultural_exchange_members — add a row
+-- (by email) to invite someone; nothing else grants access to that page.
+-- Members use their main-site account: name and avatar color come from
+-- public_profiles. "name" here is only a placeholder label shown for an
+-- invited person until they've signed in to the main site.
+create table if not exists cultural_exchange_members (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id),
+  email text not null unique,
+  name text,
+  created_at timestamptz default now()
+);
+
+-- SECURITY DEFINER so membership can be checked without an open read policy
+-- on the table itself (which would otherwise leak the whole roster of emails
+-- to anyone who's merely signed in, member or not).
+create or replace function public.is_cultural_exchange_member()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from cultural_exchange_members
+    where user_id = auth.uid() or email = auth.jwt()->>'email'
+  );
+$$;
+grant execute on function public.is_cultural_exchange_member() to authenticated;
+
+-- Links a pre-added email row to the real account the first time that person
+-- signs in, so an admin can invite someone before they've ever signed up.
+create or replace function public.claim_cultural_exchange_membership()
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update cultural_exchange_members
+  set user_id = auth.uid()
+  where email = auth.jwt()->>'email' and user_id is null;
+$$;
+grant execute on function public.claim_cultural_exchange_membership() to authenticated;
+
+alter table cultural_exchange_members enable row level security;
+drop policy if exists "members can read the roster" on cultural_exchange_members;
+create policy "members can read the roster" on cultural_exchange_members
+  for select using (public.is_cultural_exchange_member());
+
+create table if not exists cultural_exchange_activities (
+  id uuid primary key default gen_random_uuid(),
+  month text not null check (month in ('jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec')),
+  title text not null,
+  added_by uuid references auth.users(id),
+  created_at timestamptz default now()
+);
+alter table cultural_exchange_activities enable row level security;
+drop policy if exists "members can read activities" on cultural_exchange_activities;
+create policy "members can read activities" on cultural_exchange_activities
+  for select using (public.is_cultural_exchange_member());
+drop policy if exists "members can add activities" on cultural_exchange_activities;
+create policy "members can add activities" on cultural_exchange_activities
+  for insert with check (public.is_cultural_exchange_member() and added_by = auth.uid());
+drop policy if exists "members can rename activities" on cultural_exchange_activities;
+create policy "members can rename activities" on cultural_exchange_activities
+  for update using (public.is_cultural_exchange_member());
+
+create table if not exists cultural_exchange_checks (
+  id uuid primary key default gen_random_uuid(),
+  activity_id uuid not null references cultural_exchange_activities(id) on delete cascade,
+  member_id uuid not null references cultural_exchange_members(id) on delete cascade,
+  created_at timestamptz default now(),
+  constraint cultural_exchange_checks_unique unique (activity_id, member_id)
+);
+alter table cultural_exchange_checks enable row level security;
+drop policy if exists "members can read checks" on cultural_exchange_checks;
+create policy "members can read checks" on cultural_exchange_checks
+  for select using (public.is_cultural_exchange_member());
+drop policy if exists "members can add checks" on cultural_exchange_checks;
+create policy "members can add checks" on cultural_exchange_checks
+  for insert with check (public.is_cultural_exchange_member());
+drop policy if exists "members can remove checks" on cultural_exchange_checks;
+create policy "members can remove checks" on cultural_exchange_checks
+  for delete using (public.is_cultural_exchange_member());
+
+-- Seed yourself as the first member so you're not locked out of your own
+-- page. Add each friend the same way, by email, before they sign in.
+insert into cultural_exchange_members (email) values
+  ('iananthonygiles@gmail.com')
+on conflict (email) do nothing;</div>
     <button class="copy-sql-btn" onclick="copySql()">Copy</button>
     <p style="color:var(--muted);font-size:0.78rem;margin-top:8px;">Already have the app running? Just run the new block(s) above in your existing project's SQL Editor — no need to redo the rest.</p>
     <p style="color:var(--amber);font-size:0.78rem;margin-top:6px;">⚠️ This block blocks RSVPs and item sign-ups for events whose date has already passed, allows RSVPs to be deleted, adds a Google Maps link field, a cover photo URL field, and enforces an optional RSVP cap — all at the database level, using a true UTC comparison.</p>
@@ -1537,6 +1629,18 @@ function showApp() {
   const urlParams = new URLSearchParams(location.search);
   const linkedEvent = urlParams.get('event');
   const linkedProfile = urlParams.get('profile');
+  // ?signin=1&next=/path — used by sub-pages (e.g. /cultural-exchange/) that
+  // share this site's accounts: open sign-in, then send the user back.
+  if (urlParams.has('signin')) {
+    const next = urlParams.get('next') || '';
+    const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : null;
+    const goNext = () => { if (safeNext) location.href = safeNext; };
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) { goNext(); return; }
+      pendingUserAction = goNext;
+      openAuthModal('login', 'Sign in with your Galabanting account to continue.');
+    });
+  }
   if (linkedEvent) { showDetail(linkedEvent, 'public'); }
   else if (linkedProfile) { showProfile(linkedProfile, 'public'); }
   else { switchView(isAdminLoggedIn() ? 'host' : 'public'); }
