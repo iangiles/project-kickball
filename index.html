@@ -827,8 +827,12 @@ create table if not exists cultural_exchange_members (
   user_id uuid references auth.users(id),
   email text not null unique,
   name text,
+  -- hidden members keep access but don't appear in the friends list or
+  -- checklists — only as the creator of activities they add.
+  hidden boolean not null default false,
   created_at timestamptz default now()
 );
+alter table cultural_exchange_members add column if not exists hidden boolean not null default false;
 
 -- SECURITY DEFINER so membership can be checked without an open read policy
 -- on the table itself (which would otherwise leak the whole roster of emails

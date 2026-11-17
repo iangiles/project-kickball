@@ -175,7 +175,8 @@ function currentMonthId() { return MONTHS[new Date().getMonth()].id; }
 let currentUser = null;
 
 const state = {
-  members: [],      // roster rows: {id, user_id, email, name, avatar_color}
+  members: [],      // visible roster rows (hidden members left out): {id, user_id, email, name, avatar_color}
+  allMembers: [],   // full roster, incl. hidden — only for "Added by" lookups
   me: null,          // my own roster row
   acts: [],          // {id, month, title, added_by, checked:Set<memberId>}
   view: 'cards',
@@ -251,8 +252,11 @@ async function cxBootAfterAuth() {
       cxShowGate('cx-denied');
       return;
     }
-    state.members = await cxApplyProfiles(roster);
-    state.me = state.members.find(m => m.user_id === currentUser.id || m.email === currentUser.email) || state.members[0];
+    state.allMembers = await cxApplyProfiles(roster);
+    // Hidden members (e.g. the organizer) keep access but stay out of the
+    // friends list, checklists and counts; they only appear as an activity creator.
+    state.members = state.allMembers.filter(m => !m.hidden);
+    state.me = state.allMembers.find(m => m.user_id === currentUser.id || m.email === currentUser.email) || state.allMembers[0];
 
     const [actRes, checkRes] = await Promise.all([
       sb.from('cultural_exchange_activities').select('*').order('created_at'),
@@ -409,7 +413,7 @@ function cxRender() {
   const s = state;
   const total = s.members.length;
   const q = s.q.trim().toLowerCase();
-  const addedByName = a => { const m = s.members.find(mm => mm.user_id === a.added_by); return m ? m.name : 'a member'; };
+  const addedByName = a => { const m = s.allMembers.find(mm => mm.user_id === a.added_by); return m ? m.name : 'a member'; };
   const filtered = s.acts.filter(a => (s.monthFilter === 'all' || a.month === s.monthFilter) && (!q || a.title.toLowerCase().includes(q) || addedByName(a).toLowerCase().includes(q)));
   const countDone = a => s.members.filter(m => a.checked.has(m.id)).length;
 
@@ -461,7 +465,7 @@ function cxRender() {
       </form>` : `
       <h3 style="margin:4px 0 8px;font-family:var(--font-display);font-weight:600;font-size:21px;line-height:1.3;letter-spacing:-0.01em;color:var(--amber);">${esc(a.title)}</h3>`}
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;font-family:var(--font-ui);font-weight:600;font-size:14px;color:#5C4A2A;">
-        <span class="av" aria-hidden="true" style="background:${esc((s.members.find(m=>m.user_id===a.added_by)||{}).avatar_color||'#20406E')};width:26px;height:26px;font-size:12px;">${esc(addedByName(a)[0]?.toUpperCase()||'?')}</span>
+        <span class="av" aria-hidden="true" style="background:${esc((s.allMembers.find(m=>m.user_id===a.added_by)||{}).avatar_color||'#20406E')};width:26px;height:26px;font-size:12px;">${esc(addedByName(a)[0]?.toUpperCase()||'?')}</span>
         Added by ${esc(a.added_by === currentUser.id ? 'you' : addedByName(a))}
       </div>
       <div>
