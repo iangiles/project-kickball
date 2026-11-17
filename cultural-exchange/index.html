@@ -64,6 +64,7 @@
   .icon-btn { width: 44px; height: 44px; border-radius: 12px; border: none; background: transparent; color: #7A6A48; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .2s var(--ease-spring), color .2s var(--ease); }
   .icon-btn:hover { transform: translateY(-2px); color: var(--amber); }
   .icon-btn:active { transform: scale(.94); }
+  .icon-btn.danger:hover { color: var(--rose); }
 
   .logo { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; text-decoration: none; border-radius: 12px; transition: transform .2s var(--ease-spring); }
   .logo:hover { transform: translateY(-1px); }
@@ -278,10 +279,10 @@ async function cxBootAfterAuth() {
 function cxRenderNav() {
   const m = state.me;
   document.getElementById('cx-nav-right').innerHTML = `
-    <button type="button" class="profile" onclick="cxSignOut()" title="Sign out">
+    <a class="profile" href="/?profile=${encodeURIComponent(currentUser.id)}" title="View your profile">
       <span class="av" style="background:${esc(m.avatar_color||'#20406E')}" aria-hidden="true">${esc((m.name||'?')[0].toUpperCase())}</span>
       ${esc(m.name)}
-    </button>`;
+    </a>`;
 }
 
 sb.auth.onAuthStateChange((event) => {
@@ -381,6 +382,26 @@ async function cxSaveEdit(ev, id) {
   }
 }
 
+// Only the activity's creator sees the delete button; the database enforces
+// the same rule. Its checkmarks are removed with it (on delete cascade).
+async function cxDeleteActivity(id) {
+  const act = cxFindAct(id);
+  if (!act || act.added_by !== currentUser.id) return;
+  if (!confirm(`Delete "${act.title}"? Everyone's checkmarks for it will be removed too.`)) return;
+  const idx = state.acts.indexOf(act);
+  state.acts.splice(idx, 1);
+  if (state.editing === id) state.editing = null;
+  cxRender();
+  try {
+    const { error } = await sb.from('cultural_exchange_activities').delete().eq('id', id);
+    if (error) throw error;
+  } catch(e) {
+    state.acts.splice(idx, 0, act);
+    cxRender();
+    alert('Could not delete that activity: ' + e.message);
+  }
+}
+
 // ─── RENDER ─────────────────────────────────────────────────────
 function cxRender() {
   const focusedId = document.activeElement && document.activeElement.id;
@@ -422,9 +443,15 @@ function cxRender() {
           <span class="lbl">Col ${i+1}</span>
           <span class="month-pill">${esc(monthName(a.month))}</span>
         </div>
-        <button type="button" class="icon-btn" aria-label="Rename ${esc(a.title)}" onclick="cxEditActivity('${a.id}')">
-          <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg>
-        </button>
+        <div style="display:flex;align-items:center;">
+          <button type="button" class="icon-btn" aria-label="Rename ${esc(a.title)}" onclick="cxEditActivity('${a.id}')">
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg>
+          </button>
+          ${a.added_by === currentUser.id ? `
+          <button type="button" class="icon-btn danger" aria-label="Delete ${esc(a.title)}" onclick="cxDeleteActivity('${a.id}')">
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13h10l1-13"></path><path d="M9 7V4h6v3"></path></svg>
+          </button>` : ''}
+        </div>
       </div>
       ${editing ? `
       <form onsubmit="cxSaveEdit(event,'${a.id}')" style="display:flex;gap:8px;margin:6px 0 14px;">

@@ -882,6 +882,9 @@ create policy "members can add activities" on cultural_exchange_activities
 drop policy if exists "members can rename activities" on cultural_exchange_activities;
 create policy "members can rename activities" on cultural_exchange_activities
   for update using (public.is_cultural_exchange_member());
+drop policy if exists "creators can delete activities" on cultural_exchange_activities;
+create policy "creators can delete activities" on cultural_exchange_activities
+  for delete using (public.is_cultural_exchange_member() and added_by = auth.uid());
 
 create table if not exists cultural_exchange_checks (
   id uuid primary key default gen_random_uuid(),
@@ -905,7 +908,7 @@ create policy "members can remove checks" on cultural_exchange_checks
 -- SQL. Grant signed-in users only what the page needs; RLS above still
 -- limits every row to members.
 grant select on cultural_exchange_members to authenticated;
-grant select, insert, update on cultural_exchange_activities to authenticated;
+grant select, insert, update, delete on cultural_exchange_activities to authenticated;
 grant select, insert, delete on cultural_exchange_checks to authenticated;
 
 -- Seed yourself as the first member so you're not locked out of your own
