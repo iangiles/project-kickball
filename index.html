@@ -901,6 +901,13 @@ drop policy if exists "members can remove checks" on cultural_exchange_checks;
 create policy "members can remove checks" on cultural_exchange_checks
   for delete using (public.is_cultural_exchange_member());
 
+-- Newer Supabase projects don't auto-grant API access to tables created in
+-- SQL. Grant signed-in users only what the page needs; RLS above still
+-- limits every row to members.
+grant select on cultural_exchange_members to authenticated;
+grant select, insert, update on cultural_exchange_activities to authenticated;
+grant select, insert, delete on cultural_exchange_checks to authenticated;
+
 -- Seed yourself as the first member so you're not locked out of your own
 -- page. Add each friend the same way, by email, before they sign in.
 insert into cultural_exchange_members (email) values
