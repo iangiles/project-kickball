@@ -178,7 +178,7 @@ function currentMonthId() { return MONTHS[new Date().getMonth()].id; }
 let currentUser = null;
 
 const state = {
-  members: [],      // visible roster rows (hidden members left out): {id, user_id, email, name, avatar_color}
+  members: [],      // visible roster rows (hidden members left out): {id, user_id, email, name, color, avatar_color}
   allMembers: [],   // full roster, incl. hidden — only for "Added by" lookups
   me: null,          // my own roster row
   acts: [],          // {id, month, title, added_by, checked:Set<memberId>}
@@ -218,7 +218,9 @@ async function cxApplyProfiles(roster) {
     const isMe = currentUser && m.user_id === currentUser.id;
     const meta = isMe ? (currentUser.user_metadata || {}) : {};
     const name = meta.name || p.name || m.name || (m.email || '').split('@')[0] || '?';
-    const color = meta.avatar_color || p.avatar_color || brandAvatarColor(name);
+    // A color set on the roster row overrides the profile color, on this page only.
+    const override = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test((m.color || '').trim()) ? m.color.trim() : null;
+    const color = override || meta.avatar_color || p.avatar_color || brandAvatarColor(name);
     return { ...m, name, avatar_color: color };
   });
 }

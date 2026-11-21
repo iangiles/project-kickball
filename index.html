@@ -834,9 +834,13 @@ create table if not exists cultural_exchange_members (
   -- hidden members keep access but don't appear in the friends list or
   -- checklists — only as the creator of activities they add.
   hidden boolean not null default false,
+  -- optional hex color (e.g. '#D14D3E') that overrides the member's profile
+  -- avatar color on the cultural exchange page only.
+  color text,
   created_at timestamptz default now()
 );
 alter table cultural_exchange_members add column if not exists hidden boolean not null default false;
+alter table cultural_exchange_members add column if not exists color text;
 
 -- SECURITY DEFINER so membership can be checked without an open read policy
 -- on the table itself (which would otherwise leak the whole roster of emails
