@@ -452,7 +452,6 @@ function cxRender() {
     return `<article class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span class="lbl">Col ${i+1}</span>
           <span class="month-pill">${esc(monthName(a.month))}</span>
         </div>
         <div style="display:flex;align-items:center;">
@@ -484,8 +483,7 @@ function cxRender() {
       </div>
       <div class="lbl" style="margin:20px 0 10px;">Checklist</div>
       <div style="display:flex;flex-direction:column;gap:10px;">${rows}</div>
-      <div style="margin-top:20px;padding-top:14px;border-top:1.5px solid #EDE2C6;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <span style="font-size:15px;color:#7A6A48;">Column ${i+1}</span>
+      <div style="margin-top:20px;padding-top:14px;border-top:1.5px solid #EDE2C6;display:flex;align-items:center;justify-content:flex-end;gap:8px;">
         <button type="button" class="btn btn-text" onclick="cxMarkAllDone('${a.id}')">Mark all done</button>
       </div>
     </article>`;
