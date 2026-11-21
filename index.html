@@ -89,11 +89,15 @@
     .nav-user-area { flex-direction: column; align-items: stretch; }
     .nav-user-area > * { width: 100%; }
     .user-chip { justify-content: flex-start; }
+    .user-chip .chev { margin-left: auto; }
   }
 
-  .user-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 99px; padding: 4px 14px 4px 6px; font-size: 0.82rem; font-weight: 600; }
-  .user-chip .avatar-sm { width: 24px; height: 24px; border-radius: 50%; background: var(--blue); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; }
-  .user-chip-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+  .user-chip { display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 5px 14px 5px 5px; background: #fff; border: 1px solid rgba(32,48,80,0.10); border-radius: 999px; color: var(--amber); font-family: var(--font-ui); font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; cursor: pointer; box-shadow: 0 1px 2px rgba(32,48,80,0.06), 0 10px 22px -14px rgba(32,48,80,0.35); transition: transform .2s var(--ease-spring), box-shadow .2s var(--ease); }
+  .user-chip:hover { transform: translateY(-1px); box-shadow: 0 1px 2px rgba(32,48,80,0.08), 0 14px 28px -14px rgba(32,48,80,0.45); }
+  .user-chip:active { transform: scale(.97); }
+  .user-chip .avatar-sm { width: 36px; height: 36px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: 800; flex-shrink: 0; }
+  .user-chip-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-chip .chev { flex-shrink: 0; margin-left: 2px; opacity: .85; }
 
   /* MOBILE BOTTOM TAB BAR */
   .mobile-tabbar { display: none; }
@@ -1786,8 +1790,9 @@ function renderUserNav() {
   const el = document.getElementById('nav-user-area');
   if (currentUser) {
     el.innerHTML = `
-      <button class="user-chip" style="cursor:pointer;border:1px solid var(--border);" onclick="switchView('account-settings')">
-        <span class="avatar-sm" style="background:${esc(userAvatarColor())};">${userInitial()}</span><span class="user-chip-name">${esc(userDisplayName())}</span>
+      <button class="user-chip" onclick="switchView('account-settings')">
+        <span class="avatar-sm" style="background:${esc(userAvatarColor())};" aria-hidden="true">${userInitial()}</span><span class="user-chip-name">${esc(userDisplayName())}</span>
+        <svg class="chev" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
       </button>`;
   } else {
     el.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="switchView('account-settings')">Sign In</button>`;
