@@ -824,8 +824,9 @@ alter table items add column if not exists category text not null default 'food'
 -- Access is gated entirely by rows in cultural_exchange_members — add a row
 -- (by email) to invite someone; nothing else grants access to that page.
 -- Members use their main-site account: name and avatar color come from
--- public_profiles. "name" here is only a placeholder label shown for an
--- invited person until they've signed in to the main site.
+-- public_profiles, unless overridden here: a non-empty "name" or "color" on
+-- the roster row replaces the profile's name / avatar color on the cultural
+-- exchange page only (the main site keeps using the profile values).
 create table if not exists cultural_exchange_members (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id),

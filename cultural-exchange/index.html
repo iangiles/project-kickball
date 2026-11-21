@@ -217,7 +217,9 @@ async function cxApplyProfiles(roster) {
     const p = profiles[m.user_id] || {};
     const isMe = currentUser && m.user_id === currentUser.id;
     const meta = isMe ? (currentUser.user_metadata || {}) : {};
-    const name = meta.name || p.name || m.name || (m.email || '').split('@')[0] || '?';
+    // A name set on the roster row overrides the profile name, on this page only.
+    const rosterName = (m.name || '').trim();
+    const name = rosterName || meta.name || p.name || (m.email || '').split('@')[0] || '?';
     // A color set on the roster row overrides the profile color, on this page only.
     const override = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test((m.color || '').trim()) ? m.color.trim() : null;
     const color = override || meta.avatar_color || p.avatar_color || brandAvatarColor(name);
