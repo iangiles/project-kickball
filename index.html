@@ -890,6 +890,8 @@ alter table cultural_exchange_activities add column if not exists year int;
 update cultural_exchange_activities set year = extract(year from created_at)::int where year is null;
 alter table cultural_exchange_activities alter column year set default extract(year from now())::int;
 alter table cultural_exchange_activities alter column year set not null;
+-- Optional web link shown on the activity's card.
+alter table cultural_exchange_activities add column if not exists link text;
 alter table cultural_exchange_activities enable row level security;
 drop policy if exists "members can read activities" on cultural_exchange_activities;
 create policy "members can read activities" on cultural_exchange_activities
