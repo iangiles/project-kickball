@@ -175,6 +175,35 @@ const MONTHS = [
 function monthName(id) { return (MONTHS.find(m => m.id === id) || {}).name || id; }
 function currentMonthId() { return MONTHS[new Date().getMonth()].id; }
 
+// Months are identified by a sortable "YYYY-MM" key (e.g. "2026-11").
+function monthKey(year, monthId) {
+  const i = MONTHS.findIndex(m => m.id === monthId);
+  return year + '-' + String(i + 1).padStart(2, '0');
+}
+function currentKey() { const d = new Date(); return monthKey(d.getFullYear(), currentMonthId()); }
+function parseKey(key) { const [y, m] = key.split('-'); return { year: +y, monthId: MONTHS[+m - 1].id }; }
+function shiftKey(key, delta) {
+  const { year, monthId } = parseKey(key);
+  const t = year * 12 + MONTHS.findIndex(m => m.id === monthId) + delta;
+  return monthKey(Math.floor(t / 12), MONTHS[t % 12].id);
+}
+// Activities saved before the year column existed fall back to the year they were created.
+function actYear(a) { return a.year || new Date(a.created_at || Date.now()).getFullYear(); }
+function actKey(a) { return monthKey(actYear(a), a.month); }
+// Past months carry their year ("November 2025"); this month and later ones don't.
+function keyLabel(key) {
+  const { year, monthId } = parseKey(key);
+  return monthName(monthId) + (key < currentKey() ? ' ' + year : '');
+}
+// Months offered when adding or moving an activity: a year back to a year ahead.
+function monthChoices(extraKey) {
+  const cur = currentKey();
+  const keys = [];
+  for (let d = -12; d <= 12; d++) keys.push(shiftKey(cur, d));
+  if (extraKey && !keys.includes(extraKey)) keys.push(extraKey);
+  return keys.sort();
+}
+
 let currentUser = null;
 
 const state = {
@@ -186,10 +215,11 @@ const state = {
   monthFilter: 'all',
   q: '',
   composer: false,
-  draft: { title: '', month: currentMonthId() },
+  draft: { title: '', key: currentKey() },
   draftError: false,
   editing: null,
-  editTitle: ''
+  editTitle: '',
+  editKey: null
 };
 
 // ─── AUTH GATE ───────────────────────────────────────────────────
@@ -344,10 +374,10 @@ async function cxMarkAllDone(activityId) {
   }
 }
 
-function cxOpenComposer(monthId) {
+function cxOpenComposer(key) {
   state.composer = true;
   state.draftError = false;
-  state.draft = { title: '', month: monthId };
+  state.draft = { title: '', key: key || currentKey() };
   cxRender();
   setTimeout(() => document.getElementById('cx-title')?.focus(), 0);
 }
@@ -357,10 +387,10 @@ async function cxSaveActivity(ev) {
   ev.preventDefault();
   const title = document.getElementById('cx-title').value.trim();
   if (!title) { state.draftError = true; cxRender(); return; }
-  const month = document.getElementById('cx-month').value;
+  const { year, monthId: month } = parseKey(document.getElementById('cx-month').value);
   try {
     const { data, error } = await sb.from('cultural_exchange_activities')
-      .insert({ month, title, added_by: currentUser.id }).select().single();
+      .insert({ month, year, title, added_by: currentUser.id }).select().single();
     if (error) throw error;
     state.acts.push({ ...data, checked: new Set() });
     state.composer = false;
@@ -375,22 +405,34 @@ function cxEditActivity(id) {
   const act = cxFindAct(id);
   state.editing = state.editing === id ? null : id;
   state.editTitle = act ? act.title : '';
+  state.editKey = act ? actKey(act) : null;
   cxRender();
 }
 
 async function cxSaveEdit(ev, id) {
   ev.preventDefault();
   const title = document.getElementById('cx-edit-title').value.trim();
+  const monthSel = document.getElementById('cx-edit-month');
   state.editing = null;
-  if (!title) { cxRender(); return; }
   const act = cxFindAct(id);
-  if (act) act.title = title;
+  if (!title || !act) { cxRender(); return; }
+  const before = { title: act.title, month: act.month, year: act.year };
+  const changes = { title };
+  // Only the creator gets the month picker; the database enforces the same rule.
+  if (monthSel && act.added_by === currentUser.id) {
+    const { year, monthId } = parseKey(monthSel.value);
+    changes.month = monthId;
+    changes.year = year;
+  }
+  Object.assign(act, changes);
   cxRender();
   try {
-    const { error } = await sb.from('cultural_exchange_activities').update({ title }).eq('id', id);
+    const { error } = await sb.from('cultural_exchange_activities').update(changes).eq('id', id);
     if (error) throw error;
   } catch(e) {
-    alert('Could not rename that activity: ' + e.message);
+    Object.assign(act, before);
+    cxRender();
+    alert('Could not save that change: ' + e.message);
   }
 }
 
@@ -422,19 +464,25 @@ function cxRender() {
   const total = s.members.length;
   const q = s.q.trim().toLowerCase();
   const addedByName = a => { const m = s.allMembers.find(mm => mm.user_id === a.added_by); return m ? m.name : 'a member'; };
-  const filtered = s.acts.filter(a => (s.monthFilter === 'all' || a.month === s.monthFilter) && (!q || a.title.toLowerCase().includes(q) || addedByName(a).toLowerCase().includes(q)));
+  const curKey = currentKey();
+  const filtered = s.acts
+    .filter(a => (s.monthFilter === 'all' || actKey(a) === s.monthFilter) && (!q || a.title.toLowerCase().includes(q) || addedByName(a).toLowerCase().includes(q)))
+    .sort((x, y) => actKey(x).localeCompare(actKey(y)));
   const countDone = a => s.members.filter(m => a.checked.has(m.id)).length;
 
   const names = s.members.map(m => m.name);
   const nameList = names.length <= 1 ? names.join('') : names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
 
-  const monthsToShow = s.monthFilter === 'all'
-    ? MONTHS.filter(mo => filtered.some(a => a.month === mo.id))
-    : MONTHS.filter(mo => mo.id === s.monthFilter);
-
+  // Filter: all months, this month, and any other month that has activities.
+  const filterKeys = [...new Set([curKey, ...s.acts.map(actKey), ...(s.monthFilter !== 'all' ? [s.monthFilter] : [])])].sort();
   const monthOptions = [{ id:'all', label:'All months', count: s.acts.length }]
-    .concat(MONTHS.map(mo => ({ id: mo.id, label: mo.name, count: s.acts.filter(a => a.month === mo.id).length })))
+    .concat(filterKeys.map(k => ({ id: k, label: keyLabel(k), count: s.acts.filter(a => actKey(a) === k).length })))
     .map(c => `<option value="${c.id}" ${s.monthFilter===c.id?'selected':''}>${esc(c.label)} (${c.count})</option>`).join('');
+
+  // Default ("All months") cards view: one "Current Activities" group for this
+  // month and later, then each past month underneath, most recent first.
+  const currentActs = filtered.filter(a => actKey(a) >= curKey);
+  const pastKeys = [...new Set(filtered.filter(a => actKey(a) < curKey).map(actKey))].sort().reverse();
 
   function buildCard(a, i) {
     const n = countDone(a);
@@ -452,7 +500,7 @@ function cxRender() {
     return `<article class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span class="month-pill">${esc(monthName(a.month))}</span>
+          <span class="month-pill">${esc(keyLabel(actKey(a)))}</span>
         </div>
         <div style="display:flex;align-items:center;">
           <button type="button" class="icon-btn" aria-label="Rename ${esc(a.title)}" onclick="cxEditActivity('${a.id}')">
@@ -465,9 +513,14 @@ function cxRender() {
         </div>
       </div>
       ${editing ? `
-      <form onsubmit="cxSaveEdit(event,'${a.id}')" style="display:flex;gap:8px;margin:6px 0 14px;">
+      <form onsubmit="cxSaveEdit(event,'${a.id}')" style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px;">
         <label for="cx-edit-title" class="visually-hidden">Activity name</label>
-        <input id="cx-edit-title" class="input" style="flex:1;min-width:0;" value="${esc(a.title)}">
+        <input id="cx-edit-title" class="input" style="flex:1 1 160px;min-width:0;" value="${esc(s.editTitle)}" oninput="state.editTitle=this.value">
+        ${a.added_by === currentUser.id ? `
+        <label for="cx-edit-month" class="visually-hidden">Month</label>
+        <select id="cx-edit-month" class="select" style="flex:0 1 170px;cursor:pointer;" onchange="state.editKey=this.value">
+          ${monthChoices(actKey(a)).map(k => `<option value="${k}" ${k===s.editKey?'selected':''}>${esc(keyLabel(k))}</option>`).join('')}
+        </select>` : ''}
         <button type="submit" class="btn btn-primary" style="padding:0 16px;">Save</button>
       </form>` : `
       <h3 style="margin:4px 0 8px;font-family:var(--font-display);font-weight:600;font-size:21px;line-height:1.3;letter-spacing:-0.01em;color:var(--amber);">${esc(a.title)}</h3>`}
@@ -489,8 +542,7 @@ function cxRender() {
     </article>`;
   }
 
-  const groupsHtml = monthsToShow.map(mo => {
-    const list = filtered.filter(a => a.month === mo.id);
+  function buildGroup({ title, subtitle, addKey, addLabel, emptyTitle, list }) {
     const countLabel = list.length + (list.length === 1 ? ' activity' : ' activities');
     return `<section style="display:flex;flex-direction:column;gap:20px;">
       <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1.5px solid #EDE2C6;">
@@ -499,23 +551,37 @@ function cxRender() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4"></path></svg>
           </span>
           <div style="line-height:1.35;">
-            <h2 style="margin:0;display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:600;font-size:22px;letter-spacing:-0.02em;color:var(--amber);">${esc(mo.name)} activities <span style="padding:1px 10px;border-radius:999px;background:#F5EBD2;font-family:var(--font-ui);font-weight:700;font-size:14px;color:#5C4A2A;">${countLabel}</span></h2>
-            <p style="margin:2px 0 0;font-size:15px;color:#7A6A48;">Cultural exchange checklist for ${esc(mo.name)}</p>
+            <h2 style="margin:0;display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:600;font-size:22px;letter-spacing:-0.02em;color:var(--amber);">${esc(title)} <span style="padding:1px 10px;border-radius:999px;background:#F5EBD2;font-family:var(--font-ui);font-weight:700;font-size:14px;color:#5C4A2A;">${countLabel}</span></h2>
+            <p style="margin:2px 0 0;font-size:15px;color:#7A6A48;">${esc(subtitle)}</p>
           </div>
         </div>
-        <button type="button" class="btn btn-soft" onclick="cxOpenComposer('${mo.id}')">
+        <button type="button" class="btn btn-soft" onclick="cxOpenComposer('${addKey}')">
           <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
-          Add ${esc(mo.name)} activity
+          ${esc(addLabel)}
         </button>
       </div>
       ${!list.length ? `<div style="padding:40px 24px;border-radius:24px;border:2px dashed #E3D3A8;text-align:center;color:#7A6A48;">
-        <p style="margin:0;font-family:var(--font-display);font-weight:500;font-size:20px;color:var(--amber);">Nothing for ${esc(mo.name)} yet</p>
+        <p style="margin:0;font-family:var(--font-display);font-weight:500;font-size:20px;color:var(--amber);">${esc(emptyTitle)}</p>
         <p style="margin:4px 0 0;font-size:15px;">Add the first activity and everyone gets a checkbox for it.</p>
       </div>` : `<div class="grid">${list.map(buildCard).join('')}</div>`}
     </section>`;
-  }).join('');
+  }
+  function monthGroup(key, list) {
+    const label = keyLabel(key);
+    return buildGroup({ title: `${label} activities`, subtitle: `Cultural exchange checklist for ${label}`, addKey: key, addLabel: `Add ${label} activity`, emptyTitle: `Nothing for ${label} yet`, list });
+  }
 
-  const noGroups = monthsToShow.length === 0;
+  let groupsHtml, noGroups;
+  if (s.monthFilter === 'all') {
+    const showCurrent = currentActs.length || !q;
+    groupsHtml = (showCurrent ? buildGroup({ title: 'Current Activities', subtitle: 'Cultural exchange checklist for this month and upcoming months', addKey: curKey, addLabel: 'Add activity', emptyTitle: 'Nothing current yet', list: currentActs }) : '')
+      + pastKeys.map(k => monthGroup(k, filtered.filter(a => actKey(a) === k))).join('');
+    noGroups = !showCurrent && !pastKeys.length;
+  } else {
+    groupsHtml = monthGroup(s.monthFilter, filtered);
+    noGroups = false;
+  }
+
 
   const matrixRows = filtered.map(a => {
     const n = countDone(a);
@@ -525,7 +591,7 @@ function cxRender() {
     }).join('');
     return `<tr>
       <th scope="row" style="font-family:var(--font-display);font-weight:500;font-size:17px;color:var(--amber);">${esc(a.title)}</th>
-      <td><span class="month-pill">${esc(monthName(a.month))}</span></td>
+      <td><span class="month-pill">${esc(keyLabel(actKey(a)))}</span></td>
       ${cells}
       <td style="font-family:var(--font-ui);font-weight:700;font-size:15px;color:#5C4A2A;white-space:nowrap;">${n} of ${total}</td>
     </tr>`;
@@ -558,7 +624,7 @@ function cxRender() {
               ${s.members.map(m => `<span class="av" title="${esc(m.name)}" style="background:${esc(m.avatar_color||'#20406E')};width:36px;height:36px;margin-right:-8px;border:3px solid #F3DDA0;">${esc((m.name||'?')[0].toUpperCase())}</span>`).join('')}
             </div>
           </div>
-          <button type="button" class="btn btn-white" onclick="cxOpenComposer(${s.monthFilter==='all'?`'${currentMonthId()}'`:`'${s.monthFilter}'`})">
+          <button type="button" class="btn btn-white" onclick="cxOpenComposer('${s.monthFilter==='all'?curKey:s.monthFilter}')">
             <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
             Add activity
           </button>
@@ -593,7 +659,7 @@ function cxRender() {
             ${monthOptions}
           </select>
         </div>
-        <button type="button" class="btn btn-soft" onclick="cxOpenComposer(${s.monthFilter==='all'?`'${currentMonthId()}'`:`'${s.monthFilter}'`})">
+        <button type="button" class="btn btn-soft" onclick="cxOpenComposer('${s.monthFilter==='all'?curKey:s.monthFilter}')">
           <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
           Add for month
         </button>
@@ -607,8 +673,8 @@ function cxRender() {
         </div>
         <div style="flex:0 1 180px;display:flex;flex-direction:column;gap:6px;">
           <label class="lbl" for="cx-month">Month</label>
-          <select id="cx-month" class="select">
-            ${MONTHS.map(mo => `<option value="${mo.id}" ${mo.id===s.draft.month?'selected':''}>${esc(mo.name)}</option>`).join('')}
+          <select id="cx-month" class="select" style="cursor:pointer;" onchange="state.draft.key=this.value">
+            ${monthChoices(s.draft.key).map(k => `<option value="${k}" ${k===s.draft.key?'selected':''}>${esc(keyLabel(k))}</option>`).join('')}
           </select>
         </div>
         <div style="display:flex;gap:8px;">

@@ -885,6 +885,11 @@ create table if not exists cultural_exchange_activities (
   added_by uuid references auth.users(id),
   created_at timestamptz default now()
 );
+-- Year the activity's month belongs to (so past months can show e.g. "November 2025").
+alter table cultural_exchange_activities add column if not exists year int;
+update cultural_exchange_activities set year = extract(year from created_at)::int where year is null;
+alter table cultural_exchange_activities alter column year set default extract(year from now())::int;
+alter table cultural_exchange_activities alter column year set not null;
 alter table cultural_exchange_activities enable row level security;
 drop policy if exists "members can read activities" on cultural_exchange_activities;
 create policy "members can read activities" on cultural_exchange_activities
@@ -898,6 +903,20 @@ create policy "members can rename activities" on cultural_exchange_activities
 drop policy if exists "creators can delete activities" on cultural_exchange_activities;
 create policy "creators can delete activities" on cultural_exchange_activities
   for delete using (public.is_cultural_exchange_member() and added_by = auth.uid());
+-- Any member can rename an activity, but only its creator can move it to another month.
+create or replace function public.cultural_exchange_activity_month_guard()
+returns trigger language plpgsql as $$
+begin
+  if (new.month is distinct from old.month or new.year is distinct from old.year)
+     and old.added_by is distinct from auth.uid() then
+    raise exception 'Only the activity''s creator can change its month';
+  end if;
+  return new;
+end $$;
+drop trigger if exists cultural_exchange_activity_month_guard on cultural_exchange_activities;
+create trigger cultural_exchange_activity_month_guard
+  before update on cultural_exchange_activities
+  for each row execute function public.cultural_exchange_activity_month_guard();
 
 create table if not exists cultural_exchange_checks (
   id uuid primary key default gen_random_uuid(),
