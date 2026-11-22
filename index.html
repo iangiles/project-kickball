@@ -904,18 +904,34 @@ drop policy if exists "creators can delete activities" on cultural_exchange_acti
 create policy "creators can delete activities" on cultural_exchange_activities
   for delete using (public.is_cultural_exchange_member() and added_by = auth.uid());
 -- Any member can rename an activity, but only its creator can move it to another month.
+-- New activities, and activities being moved, must land in this month or up to three
+-- months ahead (with a day of slack either side so visitors' time zones still work).
+-- These limits only apply to signed-in site users: edits made directly in the database
+-- (SQL editor / table editor, where there's no signed-in user) can set any month.
 create or replace function public.cultural_exchange_activity_month_guard()
 returns trigger language plpgsql as $$
+declare
+  target date;
 begin
-  if (new.month is distinct from old.month or new.year is distinct from old.year)
-     and old.added_by is distinct from auth.uid() then
+  if auth.uid() is null then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and new.month is not distinct from old.month and new.year is not distinct from old.year then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and old.added_by is distinct from auth.uid() then
     raise exception 'Only the activity''s creator can change its month';
+  end if;
+  target := make_date(new.year, array_position(array['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'], new.month), 1);
+  if target < date_trunc('month', now() - interval '1 day')::date
+     or target > (date_trunc('month', now() + interval '1 day') + interval '3 months')::date then
+    raise exception 'Activities can only be set to this month or up to three months ahead';
   end if;
   return new;
 end $$;
 drop trigger if exists cultural_exchange_activity_month_guard on cultural_exchange_activities;
 create trigger cultural_exchange_activity_month_guard
-  before update on cultural_exchange_activities
+  before insert or update on cultural_exchange_activities
   for each row execute function public.cultural_exchange_activity_month_guard();
 
 create table if not exists cultural_exchange_checks (

@@ -195,12 +195,16 @@ function keyLabel(key) {
   const { year, monthId } = parseKey(key);
   return monthName(monthId) + (key < currentKey() ? ' ' + year : '');
 }
-// Months offered when adding or moving an activity: a year back to a year ahead.
-function monthChoices(extraKey) {
-  const cur = currentKey();
+// Activities can only be added to, or moved to, this month or up to three months ahead.
+const MAX_MONTHS_AHEAD = 3;
+function isSelectableKey(key) { const cur = currentKey(); return key >= cur && key <= shiftKey(cur, MAX_MONTHS_AHEAD); }
+function clampKey(key) { return key && isSelectableKey(key) ? key : currentKey(); }
+// keepKey: an existing activity's own month, kept as an option so it can be
+// renamed without moving it, even if that month is now out of range.
+function monthChoices(keepKey) {
   const keys = [];
-  for (let d = -12; d <= 12; d++) keys.push(shiftKey(cur, d));
-  if (extraKey && !keys.includes(extraKey)) keys.push(extraKey);
+  for (let d = 0; d <= MAX_MONTHS_AHEAD; d++) keys.push(shiftKey(currentKey(), d));
+  if (keepKey && !keys.includes(keepKey)) keys.push(keepKey);
   return keys.sort();
 }
 
@@ -377,7 +381,7 @@ async function cxMarkAllDone(activityId) {
 function cxOpenComposer(key) {
   state.composer = true;
   state.draftError = false;
-  state.draft = { title: '', key: key || currentKey() };
+  state.draft = { title: '', key: clampKey(key) };
   cxRender();
   setTimeout(() => document.getElementById('cx-title')?.focus(), 0);
 }
@@ -387,7 +391,9 @@ async function cxSaveActivity(ev) {
   ev.preventDefault();
   const title = document.getElementById('cx-title').value.trim();
   if (!title) { state.draftError = true; cxRender(); return; }
-  const { year, monthId: month } = parseKey(document.getElementById('cx-month').value);
+  const pickedKey = document.getElementById('cx-month').value;
+  if (!isSelectableKey(pickedKey)) { alert('Pick this month or one of the next three.'); return; }
+  const { year, monthId: month } = parseKey(pickedKey);
   try {
     const { data, error } = await sb.from('cultural_exchange_activities')
       .insert({ month, year, title, added_by: currentUser.id }).select().single();
@@ -419,7 +425,8 @@ async function cxSaveEdit(ev, id) {
   const before = { title: act.title, month: act.month, year: act.year };
   const changes = { title };
   // Only the creator gets the month picker; the database enforces the same rule.
-  if (monthSel && act.added_by === currentUser.id) {
+  if (monthSel && act.added_by === currentUser.id && monthSel.value !== actKey(act)) {
+    if (!isSelectableKey(monthSel.value)) { alert('Pick this month or one of the next three.'); cxRender(); return; }
     const { year, monthId } = parseKey(monthSel.value);
     changes.month = monthId;
     changes.year = year;
@@ -555,14 +562,14 @@ function cxRender() {
             <p style="margin:2px 0 0;font-size:15px;color:#7A6A48;">${esc(subtitle)}</p>
           </div>
         </div>
-        <button type="button" class="btn btn-soft" onclick="cxOpenComposer('${addKey}')">
+        ${isSelectableKey(addKey) ? `<button type="button" class="btn btn-soft" onclick="cxOpenComposer('${addKey}')">
           <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
           ${esc(addLabel)}
-        </button>
+        </button>` : ''}
       </div>
       ${!list.length ? `<div style="padding:40px 24px;border-radius:24px;border:2px dashed #E3D3A8;text-align:center;color:#7A6A48;">
         <p style="margin:0;font-family:var(--font-display);font-weight:500;font-size:20px;color:var(--amber);">${esc(emptyTitle)}</p>
-        <p style="margin:4px 0 0;font-size:15px;">Add the first activity and everyone gets a checkbox for it.</p>
+        ${isSelectableKey(addKey) ? `<p style="margin:4px 0 0;font-size:15px;">Add the first activity and everyone gets a checkbox for it.</p>` : ''}
       </div>` : `<div class="grid">${list.map(buildCard).join('')}</div>`}
     </section>`;
   }
